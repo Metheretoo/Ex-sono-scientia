@@ -270,19 +270,22 @@ function initTranscriptionOptions() {
       if (enableTriplets) enableTriplets.checked = false;
       if (thresholdSlider) thresholdSlider.value = 0.50;
     } else if (presetName === 'classique') {
+      // === Classique Pro — optimisé pour piano classique (Chopin, Mazurka...) ===
+      // Sensibilité 0.65 : détecte les notes douces sans les artefacts
+      // Quantification standard : évite la soupe de notes
       setTranscriberValue('piano_transcription');
-      if (useDemucsCb) useDemucsCb.checked = false;
-      setQuantizationValue('light');
+      if (useDemucsCb) useDemucsCb.checked = true;
+      setQuantizationValue('standard');
       if (removeShortCb) removeShortCb.checked = false;
-      if (minNoteInput) minNoteInput.value = 20;
+      //if (minNoteInput) minNoteInput.value = 40;
       if (mergeNearCb) mergeNearCb.checked = false;
-      if (mergeGapInput) mergeGapInput.value = 10;
+      //if (mergeGapInput) mergeGapInput.value = 25;
       if (splitHandsCb) splitHandsCb.checked = true;
       if (detectTempoCb) detectTempoCb.checked = true;
       if (detectKeyCb) detectKeyCb.checked = true;
       if (enableRubato) enableRubato.checked = true;
       if (enableTriplets) enableTriplets.checked = true;
-      if (thresholdSlider) thresholdSlider.value = 0.25;
+      if (thresholdSlider) thresholdSlider.value = 0.65;
     } else if (presetName === 'studio') {
       setTranscriberValue('piano_transcription');
       if (useDemucsCb) useDemucsCb.checked = true;
@@ -463,15 +466,17 @@ function initTranscriptionOptions() {
     else if (
       currentTranscriber === 'piano_transcription' &&
       currentDemucs === true &&
-      currentQuantization === 'light' &&
-      currentRemoveShort === false &&
-      currentMergeNear === false &&
+      currentQuantization === 'standard' &&
+      currentRemoveShort === true &&
+      currentMergeNear === true &&
       currentSplitHands === true &&
       currentDetectTempo === true &&
       currentDetectKey === true &&
       currentenableRubato === true &&
       currentenableTriplets === true &&
-      Math.abs(currentThreshold - 0.25) < 0.01
+      Math.abs(currentThreshold - 0.65) < 0.01 &&
+      parseInt(minNoteInput?.value || 50) >= 35 &&
+      parseInt(mergeGapInput?.value || 30) >= 20
     ) {
       presetBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.preset === 'classique'));
       setHqChecked(false);
@@ -1150,6 +1155,9 @@ function initToolbar() {
   /* Export MIDI */
   document.getElementById('btn-export-midi')?.addEventListener('click', exportMidi);
 
+  /* Export MusicXML */
+  document.getElementById('btn-export-xml')?.addEventListener('click', exportXml);
+
   /* ── Lecture (Play/Pause) ─────────────────────────────────────────── */
   player = new ScorePlayer(renderer);
 
@@ -1455,6 +1463,52 @@ function formatTime(seconds) {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Toasts (notifications)
+   ═══════════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Export MusicXML
+   ═══════════════════════════════════════════════════════════════════════════ */
+async function exportXml() {
+  const scoreData = editor.getScoreData();
+  if (!scoreData) {
+    showToast('⚠️ Aucune partition à exporter.', 'error');
+    return;
+  }
+
+  showToast('🎼 Génération du MusicXML en cours…', 'info');
+
+  try {
+    const response = await fetch('/api/export-musicxml', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(scoreData),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `Erreur HTTP ${response.status}`);
+    }
+
+    /* Déclencher le téléchargement */
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'partition_piano.musicxml';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast('✅ Fichier MusicXML téléchargé ! (ouvre dans MuseScore, Finale, etc.)', 'success');
+
+  } catch (err) {
+    showToast(`❌ Erreur export MusicXML : ${err.message}`, 'error', 6000);
+    console.error('[MusicXML Export]', err);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

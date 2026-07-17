@@ -5,7 +5,9 @@
 # MODÈLES DE TRANSCRIPTION
 # ─────────────────────────────────────────────────────────────────────────────
 transcriber:
-  default: "piano_transcription"  # basic_pitch | piano_transcription | transkun | hft | ensemble
+  # piano_transcription recommandé pour piano classique
+  # (basic_pitch retiré : qualité inférieure sur piano classique)
+  default: "piano_transcription"
   models:
     basic_pitch:
       model_path: "models/basic_pitch"
@@ -18,9 +20,9 @@ transcriber:
     piano_transcription:
       model_path: "models/piano_transcription"
       model_type: "onnx"
-      onset_threshold: 0.25
+      onset_threshold: 0.65   # Sensibilité classique : détecte notes douces sans artefacts
       frame_threshold: 0.3
-      minimum_note_length: 50.0
+      minimum_note_length: 40.0  # ms : filtre ghost notes < 40ms
       hq_mode: true
     transkun:
       model_path: "models/transkun"
@@ -43,21 +45,21 @@ transcriber:
         onset_weight: 1.2
         pitch_weight: 1.0
         duration_weight: 1.0
-      - name: "basic_pitch"
-        weight: 1.0
-        onset_weight: 1.0
-        pitch_weight: 1.0
-        duration_weight: 0.8
       - name: "transkun"
         weight: 1.3
         onset_weight: 1.1
         pitch_weight: 1.1
         duration_weight: 1.1
-      - name: "hft"
-        weight: 1.2
-        onset_weight: 1.0
-        pitch_weight: 1.0
-        duration_weight: 1.0
+      # - name: "basic_pitch"    # Retiré : qualité inférieure sur piano classique
+      #   weight: 1.0
+      #   onset_weight: 1.0
+      #   pitch_weight: 1.0
+      #   duration_weight: 0.8
+      # - name: "hft"            # Commenté : modèle expérimental, nécessite installation manuelle
+      #   weight: 1.2
+      #   onset_weight: 1.0
+      #   pitch_weight: 1.0
+      #   duration_weight: 1.0
     onset_tolerance: 0.05      # Tolérance temporelle pour grouper les notes (secondes)
     pitch_tolerance: 1         # Tolérance en demi-tons pour considérer même note
     min_votes: 2               # Votes minimum pour garder une note
@@ -83,7 +85,7 @@ quantization:
   default: "standard"  # none | light | standard | heavy | rubato | triplets
   levels:
     none:
-      grid_resolution: 0.0625      # 1/16 note
+      grid_resolution: 0.0625      # 1/16 note (brut)
       ioi_tolerance: 0.0
       swing_ratio: 1.0
       detect_tuples: false
@@ -93,7 +95,7 @@ quantization:
       swing_ratio: 1.0
       detect_tuples: false
     standard:
-      grid_resolution: 0.25        # 1/4 note
+      grid_resolution: 0.125       # 1/8 note (double-croche) — adapté piano classique
       ioi_tolerance: 0.15
       swing_ratio: 1.0
       detect_tuples: true

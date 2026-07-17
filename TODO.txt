@@ -1,5 +1,6 @@
 Emergent :
 2026-07-16 : sle..., s.lemesle@hotmail.com
+2026-07-17 : s.lemesle@hotmail.fr
 
 
 Phase 5 : brancher HFT-Transformer (piano classique SOTA)
