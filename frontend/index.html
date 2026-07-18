@@ -76,6 +76,9 @@
             <button type="button" class="preset-btn" id="preset-studio" data-preset="studio" title="Mode Studio (Précision) :&#10;• Mode Haute Qualité Piano : Activé&#10;• Isolation (Demucs) : Activée&#10;• Quantisation : Légère (arrondi à la triple-croche)&#10;→ Idéal pour : Musique classique, jazz ou jeu expressif. Préserve les micro-rythmes (rubato, arpèges rapides) au prix d'une partition plus dense.">Studio</button>
             <button type="button" class="preset-btn" id="preset-jazz" data-preset="jazz" title="Mode Jazz (Simplifié) :&#10;• Transcripteur : Piano Transcription&#10;• Isolation (Demucs) : Activée&#10;• Quantisation : Forte (arrondi à la croche)&#10;→ Idéal pour : Morceaux swing ou à rubato que l'on veut simplifier pour la lecture sans petites subdivisions inutiles.">Jazz</button>
             <button type="button" class="preset-btn" id="preset-precision" data-preset="precision" title="Mode Precision (Transcription classique complexe) :&#10;• Transcripteur : Transkun&#10;• Isolation (Demucs) : Activée&#10;• Quantisation : Précision (grille 1/32 beat, snap très doux 0.10)&#10;• Rubato + Triolets activés&#10;→ Idéal pour : Partitions classiques complexes avec minimum de notes en trop. Sensibilité de quantification recommandée : 0.2-0.4.">Precision</button>
+            <button type="button" class="preset-btn" id="preset-ultra-classique" data-preset="ultra-classique" title="Mode Ultra-classique :&#10;• Transcripteur : Piano Transcription&#10;• Quantisation : Ultra-classique (grille 1/16 beat, snap 0.08)&#10;• Zéro fusion de notes&#10;• Rubato + Triolets activés&#10;→ Idéal pour : Chopin, Debussy et musique classique expressive avec arpeges rapides.">Ultra-classique</button>
+            <button type="button" class="preset-btn" id="preset-classique-soft" data-preset="classique-soft" title="Mode Classique-soft :&#10;• Transcripteur : Piano Transcription&#10;• Quantisation : Classique-soft (snap ultra-doux 0.08)&#10;• Zéro fusion de notes&#10;• Rubato + Triolets activés&#10;→ Idéal pour : Transcription déjà précise où on veut minimiser les modifications rythmiques.">Classique-soft</button>
+            <button type="button" class="preset-btn" id="preset-transkun" data-preset="transkun" title="Mode Transkun :&#10;• Transcripteur : Transkun&#10;• Quantisation : Transkun (snap 0.20, grille 1/16)&#10;• Isolation (Demucs) : Activée&#10;• Rubato + Triolets activés&#10;→ Idéal pour : Maximiser l'expressivité du modèle Transkun avec quantification douce.">Transkun</button>
           </div>
         </div>
 
@@ -140,7 +143,7 @@
             </div>
 
 <!-- Quantification -->
-<div class="setting-item" title="Ajuste la rigidité de la grille rythmique (l'arrondi des notes) :&#10;• Aucune : Rythme brut (injouable, utile pour le debug)&#10;• Légère (1/32) : Garde le jeu 'humain', utile pour le classique ou le jazz très expressif.&#10;• Standard (1/16) : Le meilleur compromis de lisibilité (Pop/Variété).&#10;• Forte (1/8) : Simplifie le morceau au maximum, idéal pour les débutants (évite les syncopes complexes).">
+<div class="setting-item" title="Ajuste la rigidité de la grille rythmique (l'arrondi des notes) :&#10;• Aucune : Rythme brut (injouable, utile pour le debug)&#10;• Légère (1/32) : Garde le jeu 'humain', utile pour le classique ou le jazz très expressif.&#10;• Standard (1/16) : Le meilleur compromis de lisibilité (Pop/Variété).&#10;• Forte (1/8) : Simplifie le morceau au maximum, idéal pour les débutants (évite les syncopes complexes).&#10;• ⚠️ Les presets 'Ultra-classique', 'Classique-soft' et 'Transkun' sont maintenant des boutons en haut de la section 'Mode de qualité' — ne les sélectionnez pas ici.">
   <span class="setting-label">Quantification</span>
   <div class="radio-group-premium inline-flex">
     <label class="radio-label-premium" title="Rythme brut (injouable, utile pour le debug)">
@@ -177,21 +180,60 @@
               </div>
             </div>
 
-             <!-- Filtrage harmonique (piano classique) -->
-             <div class="setting-item" title="Filtre les 'notes fantômes' causées par les harmoniques.&#10;• Une note grave jouée avec pédale crée des harmoniques à l'octave (+12 demi-tons) et quinte (+7).&#10;• Ces harmoniques sont détectés comme des notes par l'IA et apparaissent en trop dans la partition.&#10;• Le filtrage les supprime en se basant sur la vélocité et la simultanéité.&#10;• Classique : recommandé pour Chopin, Debussy, etc.&#10;• Agressif : pour partitions très complexes (mazurkas, nocturnes).">
-               <label class="setting-label">
-                 🎹 Filtrage harmonique
-                 <span id="harmonic-filter-display" class="threshold-val">Classique</span>
-               </label>
-               <select id="harmonic-filter" class="input-field select-field" aria-label="Filtrage harmonique">
-                 <option value="off" selected>Désactivé</option>
-                 <option value="basic">Basique</option>
-                 <option value="classical">Classique (recommandé)</option>
-                 <option value="aggressive">Agressif</option>
-                 <option value="pedal-aware">🎹 Anti-pédale (spécialisé)</option>
-               </select>
-               <small class="setting-hint">Supprime les harmoniques fantômes (notes en trop dues à la pédale)</small>
-             </div>
+              <!-- Filtrage harmonique (piano classique) -->
+              <div class="setting-item" title="Filtre les 'notes fantômes' causées par les harmoniques.&#10;• Une note grave jouée avec pédale crée des harmoniques à l'octave (+12 demi-tons) et quinte (+7).&#10;• Ces harmoniques sont détectés comme des notes par l'IA et apparaissent en trop dans la partition.&#10;• Le filtrage les supprime en se basant sur la vélocité et la simultanéité.&#10;• Classique : recommandé pour Chopin, Debussy, etc.&#10;• Agressif : pour partitions très complexes (mazurkas, nocturnes).">
+                <label class="setting-label">
+                  🎹 Filtrage harmonique
+                  <span id="harmonic-filter-display" class="threshold-val">Classique renforcé</span>
+                </label>
+                <select id="harmonic-filter" class="input-field select-field" aria-label="Filtrage harmonique">
+                  <option value="off">Désactivé</option>
+                  <option value="basic">Basique (léger)</option>
+                  <option value="classical">Classique</option>
+                  <option value="classical-strong" selected>Classique renforcé (Chopin/Nocturnes)</option>
+                  <option value="pedal-aware">🎹 Anti-pédale (spécialisé)</option>
+                  <option value="aggressive">Agressif (romantique)</option>
+                  <option value="ultra">Ultra (maximum)</option>
+                  <option value="custom">⚙️ Personnalisé (paramètres manuels)</option>
+                </select>
+                <small class="setting-hint">Supprime les harmoniques fantômes (notes en trop dues à la pédale)</small>
+              </div>
+
+              <!-- Paramètres personnalisés du filtrage harmonique (affichés quand custom sélectionné) -->
+              <div id="custom-harmonic-params" class="custom-harmonic-params" style="display: none;">
+                <div class="setting-item" style="border-left: 3px solid var(--accent); padding-left: 12px;">
+                  <label class="setting-label">
+                    Ratio de vélocité harmonique
+                    <span class="threshold-val" id="custom-harmonic-vel-display">0.35</span>
+                  </label>
+                  <input type="range" id="custom-harmonic-vel" class="range-field" min="0.0" max="1.0" step="0.01" value="0.35" />
+                  <small class="setting-hint">Seuil pour détecter les harmoniques : plus bas = plus agressif (0.35 = note < 35% de la source)</small>
+                </div>
+                <div class="setting-item" style="border-left: 3px solid var(--accent); padding-left: 12px;">
+                  <label class="setting-label">
+                    Seuil de protection
+                    <span class="threshold-val" id="custom-harmonic-prot-display">0.88</span>
+                  </label>
+                  <input type="range" id="custom-harmonic-prot" class="range-field" min="0.5" max="1.0" step="0.01" value="0.88" />
+                  <small class="setting-hint">Notes au-dessus de ce seuil sont toujours conservées (mélodie protégée)</small>
+                </div>
+                <div class="setting-item" style="border-left: 3px solid var(--accent); padding-left: 12px;">
+                  <label class="setting-label">
+                    Tolérance temporelle
+                    <span class="threshold-val" id="custom-harmonic-time-display">0.07s</span>
+                  </label>
+                  <input type="range" id="custom-harmonic-time" class="range-field" min="0.0" max="0.5" step="0.01" value="0.07" />
+                  <small class="setting-hint">Fenêtre de simultanéité : plus large = détecte plus d'harmoniques de pédale</small>
+                </div>
+                <div class="setting-item" style="border-left: 3px solid var(--accent); padding-left: 12px;">
+                  <label class="setting-label">
+                    Seuil des basses
+                    <span class="threshold-val" id="custom-harmonic-bass-display">36</span>
+                  </label>
+                  <input type="range" id="custom-harmonic-bass" class="range-field" min="12" max="72" step="1" value="36" />
+                  <small class="setting-hint">Note MIDI au-dessus de laquelle on ne considère plus les basses (36 = Do1)</small>
+                </div>
+              </div>
 
              <!-- Sensibilité de quantification -->
              <div class="setting-item" title="Contrôle la précision de la quantification rythmique (l'arrondi des notes sur la grille).&#10;• 0.0 = Quantification minimale : pas de snap, timings bruts préservés.&#10;• 0.5 = Quantification moyenne : snap modéré.&#10;• 1.0 = Quantification forte : snap agressif sur la grille.&#10;• Utilisé EN PLUS du niveau de quantification (Légère/Standard/Forte) pour un contrôle plus fin.">
@@ -200,7 +242,7 @@
                 <span id="quantization-sensitivity-display" class="threshold-val">N/A</span>
               </label>
               <input type="range" id="quantization-sensitivity" class="range-field" min="0" max="1" step="0.01"
-                value="" disabled aria-label="Sensibilité de quantification" />
+                value="0.5" disabled aria-label="Sensibilité de quantification" />
               <div class="range-labels">
                 <span>Minimale</span>
                 <span>Forte</span>
@@ -265,7 +307,7 @@
                 <span id="meter-auto-badge" class="auto-detected-badge" style="display:none;">Auto-détecté ✓</span>
               </label>
               <select id="time-sig" class="input-field select-field" aria-label="Chiffrage de mesure">
-                <option value="4/4">4/4 — Quadruple</option>
+                <option value="4/4" selected>4/4 — Quadruple</option>
                 <option value="3/4">3/4 — Triple</option>
                 <option value="2/4">2/4 — Binaire</option>
                 <option value="3/8">3/8 — Simple (croche)</option>

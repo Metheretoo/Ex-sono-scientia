@@ -49,7 +49,7 @@ def _init_pydantic_models():
             detect_tempo: bool = True
             detect_meter: bool = True
             detect_key: bool = True
-            quantization_level: Literal['none', 'simple', 'standard', 'strict', 'classique', 'precision'] = 'standard'
+            quantization_level: Literal['none', 'simple', 'standard', 'strict', 'classique', 'classique-soft', 'ultra-classique', 'precision', 'transkun'] = 'standard'
             remove_short_notes: bool = False
             merge_near_notes: bool = False
             merge_gap_ms: int = Field(default=30, ge=10, le=200)
@@ -65,12 +65,15 @@ def _init_pydantic_models():
             #   aggressive  — très agressif (romantique)
             #   ultra       — maximum (notes vélocité > 0.25 considérées)
             #   off         — aucun filtrage
-            harmonic_filter: Optional[Literal['basic', 'classical', 'classical-strong', 'pedal-aware', 'aggressive', 'ultra', 'off']] = Field(default='classical-strong')  # défaut: classical-strong pour Chopin/Nocturnes/Mazurkas
+            harmonic_filter: Optional[Literal['basic', 'classical', 'classical-strong', 'pedal-aware', 'aggressive', 'ultra', 'ultra-classical', 'classical-soft', 'transkun', 'off']] = Field(default='classical-strong')
             # Paramètres manuels fins du filtrage harmonique (optionnels, remplacent les méthodes prédéfinies)
             harmonic_velocity_ratio: Optional[float] = Field(default=None, ge=0.0, le=1.0)
             harmonic_protection_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
             harmonic_time_tolerance: Optional[float] = Field(default=None, ge=0.0, le=0.5)
             harmonic_bass_threshold: Optional[int] = Field(default=None, ge=12, le=72)
+            # NOUVEAU : paramètres de quantification fins (exposés dans l'UI)
+            quantization_snap_threshold: Optional[float] = Field(default=None, ge=0.001, le=0.5)
+            quantization_grid: Optional[str] = Field(default=None)  # '1/4', '1/8', '1/16', '1/32'
             strict_mode: bool = False
             tempo: Optional[float] = Field(default=None, ge=40, le=300)
 
@@ -413,7 +416,23 @@ def transcribe():
         'quantization_sensitivity': request.form.get('quantization_sensitivity'),
         'harmonic_filter': request.form.get('harmonic_filter', 'classical-strong'),  # défaut: classical-strong pour Chopin/Nocturnes/Mazurkas
         'strict_mode': request.form.get('strict_mode', 'false') == 'true',
+        # NOUVEAU : paramètres de quantification fins
+        'quantization_snap_threshold': request.form.get('quantization_snap_threshold'),
+        'quantization_grid': request.form.get('quantization_grid'),
     }
+    # Convertir quantization_snap_threshold en float ou None
+    qsnap = form_dict.get('quantization_snap_threshold')
+    if qsnap and qsnap.strip():
+        try:
+            form_dict['quantization_snap_threshold'] = float(qsnap)
+        except (ValueError, TypeError):
+            form_dict['quantization_snap_threshold'] = None
+    else:
+        form_dict['quantization_snap_threshold'] = None
+    # quantization_grid reste une string (ou None)
+    qgrid = form_dict.get('quantization_grid')
+    if not qgrid or not qgrid.strip():
+        form_dict['quantization_grid'] = None
     # Convertir quantization_sensitivity en float ou None
     qs = form_dict.get('quantization_sensitivity')
     if qs and qs.strip():

@@ -879,6 +879,8 @@ input[type="file"] { display: none; }
 .preset-buttons {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .preset-btn {

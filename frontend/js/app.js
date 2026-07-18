@@ -156,8 +156,12 @@ function initUploadZone() {
     transBtn.disabled = true;
     currentJobId = null;
     window.currentScoreData = null;
+    // Réinitialiser la mesure à 4/4 par défaut
     const timeSigSel = document.getElementById('time-sig');
-    if (timeSigSel) delete timeSigSel.dataset.userOverride;
+    if (timeSigSel) {
+      timeSigSel.value = '4/4';
+      delete timeSigSel.dataset.userOverride;
+    }
     const meterBadge = document.getElementById('meter-auto-badge');
     if (meterBadge) meterBadge.style.display = 'none';
     const tempoInfo = document.getElementById('tempo-detected-info');
@@ -244,8 +248,17 @@ function initTranscriptionOptions() {
     // Mettre à jour le label d'affichage
     const display = document.getElementById('harmonic-filter-display');
     if (display) {
-      const labels = { off: 'Désactivé', basic: 'Basique', classical: 'Classique', aggressive: 'Agressif', 'pedal-aware': 'Anti-pédale' };
+      const labels = { off: 'Désactivé', basic: 'Basique', classical: 'Classique', 'classical-strong': 'Classique renforcé', aggressive: 'Agressif', 'pedal-aware': 'Anti-pédale', ultra: 'Ultra', custom: 'Personnalisé' };
       display.textContent = labels[val] || 'Classique';
+    }
+    // Afficher/masquer les paramètres personnalisés
+    updateCustomHarmonicVisibility(val);
+  }
+
+  function updateCustomHarmonicVisibility(value) {
+    const panel = document.getElementById('custom-harmonic-params');
+    if (panel) {
+      panel.style.display = value === 'custom' ? 'block' : 'none';
     }
   }
 
@@ -337,6 +350,7 @@ function initTranscriptionOptions() {
       if (thresholdSlider) thresholdSlider.value = 0.67;
       setHarmonicFilterValue('off');
     } else if (presetName === 'precision') {
+      // Transkun + filtrage harmonique Transkun v2 (agressif) — optimal pour classique complexe
       setTranscriberValue('transkun');
       if (useDemucsCb) useDemucsCb.checked = true;
       setQuantizationValue('heavy');
@@ -348,9 +362,57 @@ function initTranscriptionOptions() {
       if (enableRubato) enableRubato.checked = true;
       if (enableTriplets) enableTriplets.checked = true;
       if (thresholdSlider) thresholdSlider.value = 0.33;
-      // Utiliser le filtrage anti-pédale spécialisé (le plus efficace pour notes en trop)
-      setHarmonicFilterValue('pedal-aware');
+      // Utiliser le filtrage harmonique Transkun v2 (agressif) — élimine les notes en trop
+      setHarmonicFilterValue('transkun');
       if (qsSlider) qsSlider.value = 0.90;
+    } else if (presetName === 'ultra-classique') {
+      // Grille 1/16 beat, snap très doux (0.08), zéro fusion — idéal pour Chopin/Debussy
+      setTranscriberValue('piano_transcription');
+      if (useDemucsCb) useDemucsCb.checked = true;
+      setQuantizationValue('ultra-classique');
+      if (removeShortCb) removeShortCb.checked = false;
+      if (mergeNearCb) mergeNearCb.checked = false;  // zéro fusion
+      if (mergeGapInput) mergeGapInput.value = 5;
+      if (splitHandsCb) splitHandsCb.checked = true;
+      if (detectTempoCb) detectTempoCb.checked = true;
+      if (detectKeyCb) detectKeyCb.checked = true;
+      if (enableRubato) enableRubato.checked = true;
+      if (enableTriplets) enableTriplets.checked = true;
+      if (thresholdSlider) thresholdSlider.value = 0.30;  // haute sensibilité
+      setHarmonicFilterValue('ultra');  // maximum pour notes en trop
+      if (qsSlider) qsSlider.value = 0.5;
+    } else if (presetName === 'classique-soft') {
+      // Snap ultra-doux (0.08) — transcription déjà précise
+      setTranscriberValue('piano_transcription');
+      if (useDemucsCb) useDemucsCb.checked = true;
+      setQuantizationValue('classique-soft');
+      if (removeShortCb) removeShortCb.checked = false;
+      if (mergeNearCb) mergeNearCb.checked = false;
+      if (mergeGapInput) mergeGapInput.value = 5;
+      if (splitHandsCb) splitHandsCb.checked = true;
+      if (detectTempoCb) detectTempoCb.checked = true;
+      if (detectKeyCb) detectKeyCb.checked = true;
+      if (enableRubato) enableRubato.checked = true;
+      if (enableTriplets) enableTriplets.checked = true;
+      if (thresholdSlider) thresholdSlider.value = 0.35;
+      setHarmonicFilterValue('ultra');
+      if (qsSlider) qsSlider.value = 0.5;
+    } else if (presetName === 'transkun') {
+      // Optimisé pour le modèle Transkun — snap moyen (0.20), grille 1/16
+      setTranscriberValue('transkun');
+      if (useDemucsCb) useDemucsCb.checked = true;
+      setQuantizationValue('transkun');
+      if (removeShortCb) removeShortCb.checked = false;
+      if (mergeNearCb) mergeNearCb.checked = false;
+      if (mergeGapInput) mergeGapInput.value = 5;
+      if (splitHandsCb) splitHandsCb.checked = true;
+      if (detectTempoCb) detectTempoCb.checked = true;
+      if (detectKeyCb) detectKeyCb.checked = true;
+      if (enableRubato) enableRubato.checked = true;
+      if (enableTriplets) enableTriplets.checked = true;
+      if (thresholdSlider) thresholdSlider.value = 0.33;
+      setHarmonicFilterValue('transkun');
+      if (qsSlider) qsSlider.value = 0.6;  // snap moyen
     }
 
     const display = document.getElementById('threshold-display');
@@ -423,10 +485,37 @@ function initTranscriptionOptions() {
 
   presetBtns.forEach(btn => btn.addEventListener('click', () => applyPreset(btn.dataset.preset)));
 
+  // Écouteurs pour les sliders de paramètres personnalisés du filtre harmonique
+  const customHarmonicSliders = [
+    { id: 'custom-harmonic-vel', displayId: 'custom-harmonic-vel-display' },
+    { id: 'custom-harmonic-prot', displayId: 'custom-harmonic-prot-display' },
+    { id: 'custom-harmonic-time', displayId: 'custom-harmonic-time-display' },
+    { id: 'custom-harmonic-bass', displayId: 'custom-harmonic-bass-display' },
+  ];
+  customHarmonicSliders.forEach(({ id, displayId }) => {
+    const slider = document.getElementById(id);
+    const display = document.getElementById(displayId);
+    if (slider && display) {
+      slider.addEventListener('input', () => {
+        display.textContent = parseFloat(slider.value).toFixed(3);
+      });
+    }
+  });
+
+  // Listener dédié pour le select harmonic-filter (affiche/masque les params custom)
+  const harmonicFilterEl = document.getElementById('harmonic-filter');
+  if (harmonicFilterEl) {
+    harmonicFilterEl.addEventListener('change', () => {
+      updateCustomHarmonicVisibility(harmonicFilterEl.value);
+      checkPresetMatch();
+      toggleManualFields();
+    });
+  }
+
+  // Tous les contrôles sauf harmonic-filter (déjà traité ci-dessus)
   const allControls = [
     useDemucsCb, removeShortCb, minNoteInput, mergeNearCb, mergeGapInput,
     splitHandsCb, detectTempoCb, detectKeyCb, thresholdSlider, enableRubato, enableTriplets,
-    document.getElementById('harmonic-filter')
   ];
   allControls.forEach(ctrl => {
     if (!ctrl) return;
@@ -687,8 +776,31 @@ async function startTranscription(file) {
    if (qsSlider && qsSlider.value !== '') {
      formData.append('quantization_sensitivity', qsSlider.value);
    }
-  formData.append('harmonic_filter', document.getElementById('harmonic-filter')?.value || 'classical');
-  formData.append('time_sig', document.getElementById('time-sig')?.value || '4/4');
+   const harmonicFilterEl = document.getElementById('harmonic-filter');
+   const harmonicFilterValue = harmonicFilterEl?.value || 'classical';
+   formData.append('harmonic_filter', harmonicFilterValue);
+   
+   // Si le mode 'custom' est actif, envoyer les paramètres personnalisés
+   if (harmonicFilterValue === 'custom') {
+     const customVel = document.getElementById('custom-harmonic-vel')?.value;
+     const customProt = document.getElementById('custom-harmonic-prot')?.value;
+     const customTime = document.getElementById('custom-harmonic-time')?.value;
+     const customBass = document.getElementById('custom-harmonic-bass')?.value;
+     if (customVel !== undefined && customVel !== '') {
+       formData.append('harmonic_velocity_ratio', customVel);
+     }
+     if (customProt !== undefined && customProt !== '') {
+       formData.append('harmonic_protection_threshold', customProt);
+     }
+     if (customTime !== undefined && customTime !== '') {
+       formData.append('harmonic_time_tolerance', customTime);
+     }
+     if (customBass !== undefined && customBass !== '') {
+       formData.append('harmonic_bass_threshold', customBass);
+     }
+   }
+   
+   formData.append('time_sig', document.getElementById('time-sig')?.value || '4/4');
   formData.append('key_sig', document.getElementById('key-sig-toolbar')?.value || 'C');
 
   const tempoOverride = document.getElementById('tempo-override')?.value;

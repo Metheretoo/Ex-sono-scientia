@@ -105,6 +105,21 @@ PRESETS = {
     # Idéal quand le transcriber (TruSinger/piano_transcription) fournit
     # des timings précis et qu'on veut minimiser la destruction rythmique.
     'precision': QuantizerConfig(32, 0.10, 0.0625, 0.00, True),
+    # NOUVEAU (Plan C) : preset "ultra-classique" pour transcription classique
+    # de style Chopin/Debussy avec ornements rapides et arpèges complexes.
+    # Grille 1/16 beat (plus fine que classique=8), snap très doux (0.08),
+    # durée min 1/64, zéro fusion, ternaire actif.
+    # Cible : quand on veut une quantification "invisible" mais fonctionnelle.
+    'ultra-classique': QuantizerConfig(16, 0.08, 0.0625, 0.00, True),
+    # NOUVEAU (Plan D) : preset "classique-soft" — version adoucie de 'classique'.
+    # Réduit le snap à 0.08 (était 0.15) pour éviter la fusion de notes voisines.
+    # Idéal quand le transcriber est déjà précis et qu'on veut juste un léger alignement.
+    'classique-soft': QuantizerConfig(8,  0.08, 0.125,  0.00, True),
+    # NOUVEAU (Plan D) : preset "transkun" — optimisé pour le modèle Transkun.
+    # Grille 1/16 beat, snap moyen (0.20), zéro fusion, ternaire actif.
+    # Cible : quand le modèle fournit des timings précis mais qu'un léger
+    # alignement rythmique est souhaité sans destruction du style.
+    'transkun': QuantizerConfig(16, 0.20, 0.125,  0.00, True),
 }
 
 # durée en beats → (dur_str, dots)  [beat = noire]

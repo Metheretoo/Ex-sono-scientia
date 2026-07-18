@@ -64,31 +64,6 @@ def export_musicxml(score_data: Dict[str, Any], output_path: str):
             return f"{parts[0].upper()}{parts[1]}"
         return "C4"
 
-    # ── Mapping des pédales par mesure ──────────────────────
-    # On calcule les offsets réels de chaque mesure pour positionner les pédales.
-    pedal_by_measure = {}
-    measure_offsets = []  # (start_beat, end_beat) par mesure
-    cumulative_offset = 0.0
-    for m_data in score_data.get("measures", []):
-        m_start = cumulative_offset
-        # La durée de la mesure = max des durées cumulées treble et bass
-        treble_beats = sum(item.get("duration", 1.0) for item in m_data.get("treble", []))
-        bass_beats = sum(item.get("duration", 1.0) for item in m_data.get("bass", []))
-        m_end = max(treble_beats, bass_beats)
-        measure_offsets.append((m_start, m_end))
-        cumulative_offset += max(treble_beats, bass_beats)
-
-    for pedal in score_data.get("pedalMarkings", []):
-        start_beat = pedal.get("startBeat", 0.0)
-        end_beat = pedal.get("endBeat", 0.0)
-        if end_beat <= start_beat:
-            continue
-        # Assigner à la mesure dont l'offset couvre start_beat
-        for m_idx, (m_start, m_end) in enumerate(measure_offsets):
-            if m_start <= start_beat < m_end:
-                pedal_by_measure.setdefault(m_idx, []).append(pedal)
-                break
-
     for m_idx, m_data in enumerate(score_data.get("measures", [])):
         m_num = m_idx + 1
 
@@ -110,14 +85,6 @@ def export_musicxml(score_data: Dict[str, Any], output_path: str):
                     m_treble.insert(beat_in_meas, hc)
                 except Exception:
                     pass
-
-        # Pédales : utiliser element.setAttribute pour écrire directement le XML
-        if m_idx in pedal_by_measure:
-            for pedal in pedal_by_measure[m_idx]:
-                pedal_type = pedal.get("type", "start")
-                # Insérer la pédale au début de la mesure
-                pedal_elem = music21.note.Pedal(pedalType=pedal_type)
-                m_treble.insert(0, pedal_elem)
 
         # Remplissage des notes - Treble
         for item in m_data.get("treble", []):
@@ -149,6 +116,8 @@ def export_musicxml(score_data: Dict[str, Any], output_path: str):
 
         part_treble.append(m_treble)
         part_bass.append(m_bass)
+
+    logger.info(f"[MusicXML] {len(score_data.get('measures', []))} mesures exportées")
 
     s.insert(0, part_treble)
     s.insert(0, part_bass)

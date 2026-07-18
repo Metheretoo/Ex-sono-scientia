@@ -80,6 +80,19 @@ MIN_PEDAL_HARMONIC_DURATION = 0.5
 # Tolérance pour les harmoniques doubles
 ULTRA_DOUBLE_HARMONIC_SOURCES = 1
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Transkun-specific constants (Plan A)
+# Transkun génère des artéfacts avec des caractéristiques spécifiques :
+# - Notes fantômes à vélocité moyenne-haute (0.4-0.65)
+# - Harmoniques de pédale plus étendus temporellement
+# - Notes graves fantômes à basse vélocité
+# ─────────────────────────────────────────────────────────────────────────────
+TRANSKUN_HARMONIC_VELOCITY_MAX = 0.55
+TRANSKUN_PEDAL_SIM_TOLERANCE = 0.15
+TRANSKUN_MIN_VELOCITY = 0.25
+TRANSKUN_MIN_PEDAL_DURATION = 0.6
+TRANSKUN_DOUBLE_HARMONIC_SOURCES = 1
+
 
 def is_harmonic_of(pitch: int, main_pitch: int) -> Optional[int]:
     """Vérifie si `pitch` est un harmonique de `main_pitch`."""
@@ -141,6 +154,8 @@ def filter_ghost_notes(
         return _filter_ultra(notes, options)
     elif method == "custom":
         return _filter_custom(notes, options)
+    elif method == "transkun":
+        return _filter_transkun(notes, options)
     else:
         return _filter_classical(notes, options)
 
@@ -752,6 +767,204 @@ def _filter_ultra(notes: List[Dict], options: Dict) -> List[Dict]:
     return kept
 
 
+def _filter_transkun(notes: List[Dict], options: Dict) -> List[Dict]:
+    """
+    Filtrage harmonique spécialisé pour Transkun — version 2.0 (agressif).
+    
+    Transkun a des caractéristiques spécifiques d'artéfacts :
+    - Notes fantômes à vélocité moyenne-haute (0.35-0.65)
+    - Harmoniques de pédale très étendus temporellement
+    - Notes graves fantômes à basse vélocité (< 0.25)
+    - Durées anormalement longues pour les harmoniques de pédale
+    - Double détection de notes sur les mêmes onsets
+    
+    Ce filtre utilise des seuils calibrés spécifiquement pour Transkun v2 :
+    - velocity_ratio = 0.35 (plus agressif que pedal-aware=0.45)
+    - time_tolerance = 0.10 (pédale précise)
+    - min_velocity = 0.20 (supprime les notes très faibles)
+    - min_pedal_duration = 0.35s (harmoniques de pédale détectés plus tôt)
+    """
+    kept = []
+    removed_indices = set()
+    removed_reasons = {'tk_pedal': 0, 'tk_double': 0, 'tk_weak': 0, 'tk_pattern': 0, 'tk_low_vel': 0, 'tk_long': 0}
+    
+    # Configuration Transkun v2 — seuils renforcés pour éliminer les notes en trop
+    vel_max = 0.45                              # plus agressif (0.55 → 0.45)
+    sim_tol = 0.10                             # plus précis (0.15 → 0.10)
+    min_vel = 0.20                             # plus agressif (0.25 → 0.20)
+    min_pedal_dur = 0.35                        # plus réactif (0.6 → 0.35)
+    double_src = 1
+    
+    # Notes basses fortes (susceptibles d'activer la pédale)
+    pedal_basses = []
+    for i, note in enumerate(notes):
+        if note['pitch'] < BASS_THRESHOLD and note['velocity'] > 0.3:
+            pedal_basses.append((i, note))
+    
+    pedal_basses.sort(key=lambda x: x[1]['velocity'], reverse=True)
+    
+    # Zones de pédale élargies (Transkun étend les harmoniques)
+    pedal_zones = []
+    if pedal_basses:
+        for idx, note in pedal_basses:
+            if note['velocity'] > 0.35:
+                pedal_zones.append({
+                    'pitch': note['pitch'],
+                    'velocity': note['velocity'],
+                    'start': note['onset'] - 0.08,  # + élargi (0.05 → 0.08)
+                    'end': note['onset'] + max(note['duration'], 0.8) + 0.5,  # + élargi (0.4 → 0.5)
+                })
+    
+    for i, note in enumerate(notes):
+        if i in removed_indices:
+            continue
+        
+        # ── Pré-filtre : vélocité trop basse → artéfact Transkun ──
+        if note['velocity'] < min_vel:
+            removed_indices.add(i)
+            removed_reasons['tk_low_vel'] += 1
+            continue
+        
+        # ── Pré-filtre : durée anormalement longue sans basses → tenue fantôme ──
+        if note['duration'] > 2.0 and note['velocity'] < 0.45:
+            has_bass_support = False
+            for _, bass in pedal_basses:
+                if abs(note['onset'] - bass['onset']) < sim_tol:
+                    has_bass_support = True
+                    break
+            if not has_bass_support:
+                removed_indices.add(i)
+                removed_reasons['tk_long'] += 1
+                continue
+        
+        # ── PROTECTION : notes mélodiques légitimes ──
+        if note['velocity'] > PROTECTED_VELOCITY_THRESHOLD:
+            kept.append(note)
+            continue
+        
+        if note['pitch'] > 80 and note['velocity'] > 0.50:
+            kept.append(note)
+            continue
+        
+        # Protection relative aux basses (renforcée)
+        max_rel_velocity = 0
+        for _, bass in pedal_basses:
+            if bass['velocity'] > 0:
+                rel_vel = note['velocity'] / bass['velocity']
+                max_rel_velocity = max(max_rel_velocity, rel_vel)
+        
+        if max_rel_velocity > 0.70 and note['velocity'] > 0.45:
+            kept.append(note)
+            continue
+        
+        # ── Détection par patterns harmoniques (sans basses) ──
+        if not pedal_zones:
+            harmonic_count = 0
+            harmonic_sources = []
+            for j, other in enumerate(notes):
+                if j == i or j in removed_indices:
+                    continue
+                interval = is_harmonic_of(note['pitch'], other['pitch'])
+                if interval is not None:
+                    if (other['velocity'] > note['velocity'] * 0.55 and
+                        abs(note['onset'] - other['onset']) < sim_tol):
+                        harmonic_count += 1
+                        harmonic_sources.append(j)
+            
+            if harmonic_count >= 2 and note['velocity'] < 0.40:
+                removed_indices.add(i)
+                removed_reasons['tk_pattern'] += 1
+                continue
+            
+            if harmonic_count >= 1:
+                for src_idx in harmonic_sources:
+                    src = notes[src_idx]
+                    if (src['velocity'] > 0.30 and
+                        note['duration'] > min_pedal_dur and
+                        note['velocity'] < vel_max):
+                        removed_indices.add(i)
+                        removed_reasons['tk_pattern'] += 1
+                        break
+                if i in removed_indices:
+                    continue
+            
+            if note['velocity'] < 0.30 and note['duration'] > 0.8:
+                for j, other in enumerate(notes):
+                    if j == i or j in removed_indices:
+                        continue
+                    interval = is_harmonic_of(note['pitch'], other['pitch'])
+                    if interval is not None:
+                        if abs(note['onset'] - other['onset']) < sim_tol:
+                            removed_indices.add(i)
+                            removed_reasons['tk_pattern'] += 1
+                            break
+                if i in removed_indices:
+                    continue
+        
+        # ── DÉTECTION D'HARMONIQUES DE PÉDALE (avec zones) ──
+        is_pedal_harmonic_note = False
+        
+        for zone in pedal_zones:
+            if note['onset'] < zone['start'] or note['onset'] > zone['end']:
+                continue
+            
+            interval = is_harmonic_of(note['pitch'], zone['pitch'])
+            if interval is None:
+                continue
+            
+            if note['pitch'] <= zone['pitch']:
+                continue
+            
+            # Seuil de vélocité Transkun v2 (0.45 au lieu de 0.55)
+            if note['velocity'] >= zone['velocity'] * 0.35:
+                if note['velocity'] >= vel_max:
+                    continue
+            
+            # Durée + vélocité : harmonique de pédale détectée
+            if note['duration'] > min_pedal_dur and note['velocity'] < vel_max:
+                is_pedal_harmonic_note = True
+                removed_reasons['tk_pedal'] += 1
+                break
+            
+            # Double harmonique
+            harmonic_sources = 0
+            for other_zone in pedal_zones:
+                if other_zone['pitch'] == zone['pitch']:
+                    continue
+                other_interval = is_harmonic_of(note['pitch'], other_zone['pitch'])
+                if other_interval is not None:
+                    harmonic_sources += 1
+            
+            if harmonic_sources >= double_src and note['velocity'] < vel_max:
+                is_pedal_harmonic_note = True
+                removed_reasons['tk_double'] += 1
+                break
+            
+            # Harmonique faible proche du temps d'attaque
+            if (note['velocity'] < vel_max and 
+                abs(note['onset'] - zone['start']) < sim_tol):
+                is_pedal_harmonic_note = True
+                removed_reasons['tk_weak'] += 1
+                break
+        
+        if is_pedal_harmonic_note:
+            removed_indices.add(i)
+        else:
+            kept.append(note)
+    
+    total_removed = len(notes) - len(kept)
+    print(f"[HarmonicFilter] transkun: {len(notes)} → {len(kept)} notes ({total_removed} supprimés)")
+    if total_removed > 0:
+        print(f"[HarmonicFilter]   → tk_pedal: {removed_reasons['tk_pedal']}, "
+              f"tk_double: {removed_reasons['tk_double']}, "
+              f"tk_weak: {removed_reasons['tk_weak']}, "
+              f"tk_pattern: {removed_reasons['tk_pattern']}, "
+              f"tk_low_vel: {removed_reasons['tk_low_vel']}, "
+              f"tk_long: {removed_reasons['tk_long']}")
+    
+    return kept
+
+
 def _filter_custom(notes: List[Dict], options: Dict) -> List[Dict]:
     """Filtrage harmonique avec paramètres manuels fins.
     
@@ -760,6 +973,8 @@ def _filter_custom(notes: List[Dict], options: Dict) -> List[Dict]:
     - protection_threshold: seuil de protection des notes fortes (0.0-1.0)
     - time_tolerance: fenêtre de simultanéité temporelle (en secondes)
     - bass_threshold: seuil de basse en MIDI pitch (12-72)
+    - min_velocity: vélocité minimale pour conserver une note (0.0-1.0)
+    - pedal_velocity_max: seuil pour harmoniques de pédale (0.0-1.0)
     
     Exemple d'utilisation :
         options['_custom_harmonic'] = {
@@ -767,6 +982,8 @@ def _filter_custom(notes: List[Dict], options: Dict) -> List[Dict]:
             'protection_threshold': 0.85,
             'time_tolerance': 0.06,
             'bass_threshold': 38,
+            'min_velocity': 0.25,
+            'pedal_velocity_max': 0.55,
         }
     """
     custom = options.get('_custom_harmonic', {})
