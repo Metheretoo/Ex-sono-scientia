@@ -90,20 +90,29 @@ def build_score(
     # interne (Krumhansl-Schmuckler) > 'C' par défaut.
     detect_key = options.get('detect_key', True)
     manual_key_sig = normalize_key_signature(key_sig) if key_sig else 'C'
+    import sys as _sys; _sys.stdout.flush()
+    print(f"[ScoreBuilder DEBUG] key_sig={key_sig!r} detect_key={detect_key!r} manual_key_sig={manual_key_sig!r}", flush=True)
 
-    if not detect_key and key_sig:
+    if not detect_key:
+        # L'utilisateur a désactivé la détection auto → respecter son choix (même si key_sig est vide, utiliser 'C')
         key_sig = manual_key_sig
-    elif harmonic_ctx is not None and harmonic_ctx.stable_keys:
+        print(f"[ScoreBuilder] ✅ Tonalité manuelle respectée: {key_sig} (detect_key={detect_key})")
+    elif harmonic_ctx is not None and harmonic_ctx.stable_keys and detect_key:
+        # Ne pas utiliser la tonalité harmonique si detect_key=False (l'utilisateur a choisi manuellement)
         # Prendre la tonalité de la 1ère entrée stable pour l'armure initiale
         first_key_name = harmonic_ctx.stable_keys[0][1]  # ex: "F major" / "a minor"
         key_sig = key_name_to_vexflow(first_key_name)
+        print(f"[ScoreBuilder] ⚠️ Tonalité harmonique utilisée: {first_key_name} → {key_sig} (detect_key={detect_key})")
     elif detect_key:
         all_notes = voices.treble + voices.bass
+        # Passer (onset, pitch, duration, amplitude) au détecteur
         key_sig = detect_key_signature([
-            (0, 1, n.pitch_midi, n.amplitude) for n in all_notes
+            (n.beat_position, n.pitch_midi, n.beat_duration, n.amplitude) for n in all_notes
         ])
+        print(f"[ScoreBuilder] ⚠️ Tonalité par détecteur interne: {key_sig} (detect_key={detect_key})")
     else:
         key_sig = manual_key_sig
+        print(f"[ScoreBuilder] ✅ Tonalité par défaut (fallback): {key_sig}")
     key_sig = normalize_key_signature(key_sig)
 
     # Filet de sécurité final (v4.2) : quelle que soit la branche empruntée
@@ -462,9 +471,49 @@ def _empty_score(tempo, ts_num, ts_den, key_sig='C') -> Dict[str, Any]:
 # ── Conversions MIDI ↔ VexFlow ───────────────────────────────────────────────
 
 def midi_to_vexflow_key(pitch: int, key_sig: str = 'C') -> str:
-    """MIDI pitch → clé VexFlow  (ex: 60 → 'c/4')"""
-    names = PITCH_NAMES_FLAT if key_sig in FLAT_KEY_SIGS else PITCH_NAMES_SHARP
-    return f"{names[pitch % 12]}/{(pitch // 12) - 1}"
+    """
+    MIDI pitch → clé VexFlow (ex: 60 → 'c/4', 61 → 'c#/4').
+    
+    Cette fonction map le MIDI pitch au nom de note JUSTE (avec dièse/bémol
+    correct). Les altérations de l'armure sont GÉRÉES SÉPARÉMENT par le champ
+    keySignature du score.
+    
+    Exemples :
+    - MIDI 60 (C4) → 'c/4'
+    - MIDI 61 (C#/Db) → 'c#/4' (dièse par défaut)
+    - MIDI 62 (D) → 'd/4'
+    - MIDI 63 (D#/Eb) → 'db/4' (bémol par défaut pour l'énharmonie)
+    - MIDI 64 (E) → 'e/4'
+    
+    IMPORTANT : Cette fonction NE doit PAS appliquer l'armure. Elle retourne
+    le nom de note basé uniquement sur le pitch MIDI.
+    """
+    pitch_class = pitch % 12
+    
+    # Mapping MIDI pitch class → nom de note VexFlow avec dièse/bémol
+    # Utilise les dièses par défaut, bémols pour les notes enharmones courantes
+    CLASS_TO_NAME = {
+        0: 'c',    # C
+        1: 'c#',   # C#/Db
+        2: 'd',    # D
+        3: 'd#',   # D#/Eb → db en notation bémol
+        4: 'e',    # E
+        5: 'f',    # F
+        6: 'f#',   # F#/Gb → gb en notation bémol
+        7: 'g',    # G
+        8: 'g#',   # G#/Ab → ab en notation bémol
+        9: 'a',    # A
+        10: 'a#',  # A#/Bb → bb en notation bémol
+        11: 'b',   # B
+    }
+    
+    base_name = CLASS_TO_NAME[pitch_class]
+    
+    # Retourner la note avec l'octave VexFlow
+    # VexFlow octave : c/4 = MIDI 60 (C4 = Do central)
+    vexflow_octave = (pitch // 12) - 1
+    
+    return f"{base_name}/{vexflow_octave}"
 
 
 def vexflow_key_to_pitch(key: str) -> int:
@@ -649,8 +698,10 @@ def detect_key_signature(note_events) -> str:
 
     histogram = np.zeros(12)
     for event in note_events:
-        pitch = int(event[2])
-        duration = float(event[1]) - float(event[0]) if len(event) > 1 else 1.0
+        # note_events est un tuple (onset, pitch, duration, velocity)
+        # event[0] = onset, event[1] = pitch, event[2] = duration, event[3] = velocity
+        pitch = int(event[1])  # event[1] = pitch (MIDI note number)
+        duration = float(event[2]) if len(event) > 2 else 1.0  # event[2] = duration
         amp = float(event[3]) if len(event) > 3 else 0.7
         histogram[pitch % 12] += max(0.01, duration) * amp
 
@@ -668,22 +719,28 @@ def detect_key_signature(note_events) -> str:
     }
 
     minor_keys = {
-        9: 'C', 4: 'G', 11: 'D', 6: 'A', 1: 'E', 8: 'B', 3: 'F#',
-        2: 'F', 7: 'Bb', 0: 'Eb', 5: 'Ab', 10: 'Db'
+        9: 'Cm', 4: 'Gm', 11: 'Dm', 6: 'Am', 1: 'Em', 8: 'Bm', 3: 'F#m',
+        2: 'Fm', 7: 'Bbm', 0: 'Ebm', 5: 'Abm', 10: 'Dbm'
     }
 
     for shift in range(12):
         shifted_hist = np.roll(histogram, -shift)
 
         corr_maj = np.correlate(shifted_hist, major_profile)[0]
-        if corr_maj > best_correlation:
-            best_correlation = corr_maj
-            best_key = major_keys.get(shift, 'C')
-
         corr_min = np.correlate(shifted_hist, minor_profile)[0]
-        if corr_min > best_correlation:
-            best_correlation = corr_min
-            best_key = minor_keys.get(shift, 'C')
+
+        # CORRECTION : comparer le MEILLEUR des deux modes POUR CE SHIFT,
+        # puis mettre à jour uniquement si ce meilleur score bat le global.
+        # Bug précédent : corr_maj et corr_min étaient comparés séparément,
+        # permettant un mismatch shift+mode (ex: shift=G mais mode mineur).
+        if corr_maj >= corr_min:
+            if corr_maj > best_correlation:
+                best_correlation = corr_maj
+                best_key = major_keys.get(shift, 'C')
+        else:
+            if corr_min > best_correlation:
+                best_correlation = corr_min
+                best_key = minor_keys.get(shift, 'C')
 
     return normalize_key_signature(best_key)
 

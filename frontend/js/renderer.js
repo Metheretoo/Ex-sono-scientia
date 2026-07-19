@@ -203,7 +203,8 @@ class ScoreRenderer {
             measure.bass || [],
             measureIndex,
             scoreData,
-            uncertainIds  // P6 : propager les IDs incertains
+            uncertainIds,  // P6 : propager les IDs incertains
+            safeKeySignature  // ✅ Passer l'armure validée pour applyAccidentals()
           );
         } catch (e) {
           console.warn('[Renderer] Erreur rendu conjoint mesure', measureIndex, e);
@@ -237,11 +238,12 @@ class ScoreRenderer {
   }
 
   /* ── Rendu conjoint des voix Treble et Bass pour alignement rythmique parfait ── */
-  _renderJointVoices(ctx, trebleStave, bassStave, trebleNotesData, bassNotesData, measureIndex, scoreData, uncertainIds) {
+  _renderJointVoices(ctx, trebleStave, bassStave, trebleNotesData, bassNotesData, measureIndex, scoreData, uncertainIds, keySignature) {
     // P6 : uncertainIds est un Set d'IDs de notes incertaines (fallback single-model)
     // Si non fourni ou vide, aucun traitement spécial
     const hasUncertain = uncertainIds && uncertainIds.size > 0;
     const VF = Vex.Flow;
+    const keySig = keySignature || 'C';  // ✅ Utiliser l'armure passée en argument (ou 'C' par défaut)
     const [num, den] = scoreData.timeSignature;
 
     // 1. Créer les StaveNotes
@@ -295,11 +297,12 @@ class ScoreRenderer {
     padVoiceTo(bassVoice, bassStaveNotes, maxTicks);
 
     // Altérations automatiques
+    // ✅ Utiliser keySig (désormais correctement passé depuis render())
     if (trebleStaveNotes.length > 0) {
-      try { VF.Accidental.applyAccidentals([trebleVoice], safeKeySignature || 'C'); } catch (_) { }
+      try { VF.Accidental.applyAccidentals([trebleVoice], keySig); } catch (_) { }
     }
     if (bassStaveNotes.length > 0) {
-      try { VF.Accidental.applyAccidentals([bassVoice], safeKeySignature || 'C'); } catch (_) { }
+      try { VF.Accidental.applyAccidentals([bassVoice], keySig); } catch (_) { }
     }
 
     // 3. Beaming (croches / doubles-croches) — AMÉLIORÉ

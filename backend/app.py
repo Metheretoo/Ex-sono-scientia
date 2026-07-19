@@ -45,7 +45,7 @@ def _init_pydantic_models():
             offset_threshold: float = Field(default=0.3, ge=0.0, le=1.0)
             minimum_note_duration: int = Field(default=50, ge=10, le=500)
             time_sig: str = Field(default='4/4', pattern='^[0-9]+/[0-9]+$')
-            key_sig: str = Field(default='C', pattern='^[A-G][#b]?$')
+            key_sig: str = Field(default='C', pattern='^[A-G](#{1,2}|b{1,2})?m?$')
             detect_tempo: bool = True
             detect_meter: bool = True
             detect_key: bool = True
@@ -420,6 +420,9 @@ def transcribe():
         'quantization_snap_threshold': request.form.get('quantization_snap_threshold'),
         'quantization_grid': request.form.get('quantization_grid'),
     }
+    # DEBUG tonalité
+    import sys as _sys; _sys.stdout.flush()
+    print(f"[APP DEBUG] key_sig={form_dict['key_sig']!r} detect_key={form_dict['detect_key']!r}", flush=True)
     # Convertir quantization_snap_threshold en float ou None
     qsnap = form_dict.get('quantization_snap_threshold')
     if qsnap and qsnap.strip():

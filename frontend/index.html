@@ -10,7 +10,7 @@
   <!--  <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />-->
-  <link rel="stylesheet" href="/css/style.css?v=11" />
+  <link rel="stylesheet" href="/css/style.css?v=12" />
 </head>
 
 <body>
@@ -72,13 +72,9 @@
             <button type="button" class="preset-btn" id="preset-rapide" data-preset="rapide" title="Mode Rapide :&#10;• Transcripteur : Basic Pitch&#10;• Isolation (Demucs) : Désactivée&#10;• Quantisation : Standard&#10;→ Idéal pour : Obtenir un aperçu immédiat sur un fichier contenant uniquement du piano (sans autres instruments).">Rapide</button>
             <button type="button" class="preset-btn active" id="preset-equilibre"
               data-preset="equilibre" title="Mode Équilibré (Recommandé) :&#10;• Transcripteur : Piano Transcription&#10;• Isolation (Demucs) : Activée&#10;• Quantisation : Standard (arrondi à la double-croche)&#10;→ Idéal pour : La grande majorité des morceaux (Pop, YouTube, etc.). Nettoie le bruit de fond et produit une partition lisible humainement.">Équilibré</button>
-            <button type="button" class="preset-btn" id="preset-classique" data-preset="classique" title="Mode Classique (Sensibilité max) :&#10;• Transcripteur : Piano Transcription&#10;• Isolation (Demucs) : Activée&#10;• Quantisation : Légère (arrondi à la triple-croche)&#10;• Seuil détection : 0.25 (très sensible)&#10;→ Idéal pour : Musique classique, passages pianissimo, notes très douces. Capte le maximum de notes au risque de quelques fausses détections.">Classique</button>
-            <button type="button" class="preset-btn" id="preset-studio" data-preset="studio" title="Mode Studio (Précision) :&#10;• Mode Haute Qualité Piano : Activé&#10;• Isolation (Demucs) : Activée&#10;• Quantisation : Légère (arrondi à la triple-croche)&#10;→ Idéal pour : Musique classique, jazz ou jeu expressif. Préserve les micro-rythmes (rubato, arpèges rapides) au prix d'une partition plus dense.">Studio</button>
-            <button type="button" class="preset-btn" id="preset-jazz" data-preset="jazz" title="Mode Jazz (Simplifié) :&#10;• Transcripteur : Piano Transcription&#10;• Isolation (Demucs) : Activée&#10;• Quantisation : Forte (arrondi à la croche)&#10;→ Idéal pour : Morceaux swing ou à rubato que l'on veut simplifier pour la lecture sans petites subdivisions inutiles.">Jazz</button>
             <button type="button" class="preset-btn" id="preset-precision" data-preset="precision" title="Mode Precision (Transcription classique complexe) :&#10;• Transcripteur : Transkun&#10;• Isolation (Demucs) : Activée&#10;• Quantisation : Précision (grille 1/32 beat, snap très doux 0.10)&#10;• Rubato + Triolets activés&#10;→ Idéal pour : Partitions classiques complexes avec minimum de notes en trop. Sensibilité de quantification recommandée : 0.2-0.4.">Precision</button>
-            <button type="button" class="preset-btn" id="preset-ultra-classique" data-preset="ultra-classique" title="Mode Ultra-classique :&#10;• Transcripteur : Piano Transcription&#10;• Quantisation : Ultra-classique (grille 1/16 beat, snap 0.08)&#10;• Zéro fusion de notes&#10;• Rubato + Triolets activés&#10;→ Idéal pour : Chopin, Debussy et musique classique expressive avec arpeges rapides.">Ultra-classique</button>
-            <button type="button" class="preset-btn" id="preset-classique-soft" data-preset="classique-soft" title="Mode Classique-soft :&#10;• Transcripteur : Piano Transcription&#10;• Quantisation : Classique-soft (snap ultra-doux 0.08)&#10;• Zéro fusion de notes&#10;• Rubato + Triolets activés&#10;→ Idéal pour : Transcription déjà précise où on veut minimiser les modifications rythmiques.">Classique-soft</button>
-            <button type="button" class="preset-btn" id="preset-transkun" data-preset="transkun" title="Mode Transkun :&#10;• Transcripteur : Transkun&#10;• Quantisation : Transkun (snap 0.20, grille 1/16)&#10;• Isolation (Demucs) : Activée&#10;• Rubato + Triolets activés&#10;→ Idéal pour : Maximiser l'expressivité du modèle Transkun avec quantification douce.">Transkun</button>
+            <button type="button" class="preset-btn" id="preset-classique" data-preset="classique" title="Mode Classique (Sensibilité max) :&#10;• Transcripteur : Piano Transcription&#10;• Isolation (Demucs) : Activée&#10;• Quantisation : Légère (arrondi à la triple-croche)&#10;• Seuil détection : 0.25 (très sensible)&#10;→ Idéal pour : Musique classique, passages pianissimo, notes très douces. Capte le maximum de notes au risque de quelques fausses détections.">Classique</button>
+            <button type="button" class="preset-btn" id="preset-jazz" data-preset="jazz" title="Mode Jazz (Simplifié) :&#10;• Transcripteur : Piano Transcription&#10;• Isolation (Demucs) : Activée&#10;• Quantisation : Forte (arrondi à la croche)&#10;→ Idéal pour : Morceaux swing ou à rubato que l'on veut simplifier pour la lecture sans petites subdivisions inutiles.">Jazz</button>
           </div>
         </div>
 
@@ -99,6 +95,10 @@
                 <label class="radio-label-premium" title="Transkun : Modèle Transformer SOTA avec haute précision expressive pour capturer de fines nuances.">
                   <input type="radio" name="transcriber" value="transkun" />
                   <span>Transkun (expressivité maximale)</span>
+                </label>
+                <label class="radio-label-premium" title="hFT-Transformer (Sony) : Modèle de transcription audio à base de Transformer, performant sur la détection de notes et de pédales.">
+                  <input type="radio" name="transcriber" value="hft" />
+                  <span>hFT-Transformer (Sony)</span>
                 </label>
               </div>
             </div>
@@ -189,12 +189,12 @@
                 <select id="harmonic-filter" class="input-field select-field" aria-label="Filtrage harmonique">
                   <option value="off">Désactivé</option>
                   <option value="basic">Basique (léger)</option>
-                  <option value="classical">Classique</option>
-                  <option value="classical-strong" selected>Classique renforcé (Chopin/Nocturnes)</option>
-                  <option value="transkun-chord">🎹 Transkun-chord (recommandé classique)</option>
-                  <option value="pedal-aware">🎹 Anti-pédale (spécialisé)</option>
                   <option value="aggressive">Agressif (romantique)</option>
                   <option value="ultra">Ultra (maximum)</option>
+                  <option value="classical">🎹 Classique</option>
+                  <option value="pedal-aware">🎹 Anti-pédale (spécialisé)</option>
+                  <option value="classical-strong" selected>🎹 Classique renforcé (Chopin/Nocturnes)</option>
+                  <option value="transkun-chord">🎹 Transkun-chord (recommandé classique)</option>
                   <option value="custom">⚙️ Personnalisé (paramètres manuels)</option>
                 </select>
                 <small class="setting-hint">Supprime les harmoniques fantômes (notes en trop dues à la pédale)</small>
@@ -560,10 +560,10 @@
   <!-- ══ Scripts ════════════════════════════════════════════════════════════════ -->
   <script src="/js/lib/soundfont-player.min.js"></script>
   <script src="/js/lib/vexflow.js"></script>
-  <script src="/js/renderer.js?v=15"></script>
-  <script src="/js/editor.js?v=15"></script>
-  <script src="/static/js/ScorePlayer.js?v=11"></script>
-  <script src="/static/js/app.js?v=15"></script>
+  <script src="/js/renderer.js?v=17"></script>
+  <script src="/js/editor.js?v=17"></script>
+  <script src="/static/js/ScorePlayer.js?v=13"></script>
+<script src="/static/js/app.js?v=18"></script>
 
 </body>
 

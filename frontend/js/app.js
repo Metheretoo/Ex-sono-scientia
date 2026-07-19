@@ -149,6 +149,7 @@ function initUploadZone() {
 
   document.getElementById('btn-new-upload')?.addEventListener('click', () => {
     if (player) player.stop();
+	updateProgress(0);
     showSection('upload');
     selectedFile = null;
     fileInput.value = '';
@@ -278,51 +279,25 @@ function initTranscriptionOptions() {
     };
 
     if (presetName === 'rapide') {
-      setTranscriberValue('piano_transcription');
+      setTranscriberValue('hft');
       if (useDemucsCb) useDemucsCb.checked = false;
       setQuantizationValue('light');
       if (removeShortCb) removeShortCb.checked = false;
       if (mergeNearCb) mergeNearCb.checked = false;
-      if (splitHandsCb) splitHandsCb.checked = false;
-      if (detectTempoCb) detectTempoCb.checked = false;
-      if (detectKeyCb) detectKeyCb.checked = false;
+      if (splitHandsCb) splitHandsCb.checked = true;
+      if (detectTempoCb) detectTempoCb.checked = true;
+      if (detectMeterCb) detectMeterCb.checked = true;
+      if (detectKeyCb) detectKeyCb.checked = true;
       if (enableRubato) enableRubato.checked = false;
       if (enableTriplets) enableTriplets.checked = false;
+      if (showPedalCb) showPedalCb.checked = false;
+      if (showChordsCbToggle) showChordsCbToggle.checked = false;
       if (thresholdSlider) thresholdSlider.value = 1;
       setHarmonicFilterValue('off');
-      // Réinitialiser le slider de sensibilité pour ce preset
       if (qsSlider) qsSlider.value = 0.5;
     } else if (presetName === 'equilibre') {
-      setTranscriberValue('piano_transcription');
-      if (useDemucsCb) useDemucsCb.checked = false;
-      setQuantizationValue('standard');
-      if (removeShortCb) removeShortCb.checked = false;
-      if (minNoteInput) minNoteInput.value = 20;
-      if (mergeNearCb) mergeNearCb.checked = false;
-      if (mergeGapInput) mergeGapInput.value = 10;
-      if (splitHandsCb) splitHandsCb.checked = true;
-      if (detectTempoCb) detectTempoCb.checked = true;
-      if (detectKeyCb) detectKeyCb.checked = true;
-      if (enableRubato) enableRubato.checked = false;
-      if (enableTriplets) enableTriplets.checked = false;
-      if (thresholdSlider) thresholdSlider.value = 0.55;
-      setHarmonicFilterValue('off');
-    } else if (presetName === 'classique') {
       setTranscriberValue('transkun');
       if (useDemucsCb) useDemucsCb.checked = false;
-      setQuantizationValue('light');
-      if (removeShortCb) removeShortCb.checked = false;
-      if (mergeNearCb) mergeNearCb.checked = false;
-      if (splitHandsCb) splitHandsCb.checked = true;
-      if (detectTempoCb) detectTempoCb.checked = true;
-      if (detectKeyCb) detectKeyCb.checked = true;
-      if (enableRubato) enableRubato.checked = true;
-      if (enableTriplets) enableTriplets.checked = true;
-      if (thresholdSlider) thresholdSlider.value = 0.33;
-      setHarmonicFilterValue('classical');
-    } else if (presetName === 'studio') {
-      setTranscriberValue('piano_transcription');
-      if (useDemucsCb) useDemucsCb.checked = true;
       setQuantizationValue('standard');
       if (removeShortCb) removeShortCb.checked = false;
       if (minNoteInput) minNoteInput.value = 20;
@@ -330,91 +305,71 @@ function initTranscriptionOptions() {
       if (mergeGapInput) mergeGapInput.value = 10;
       if (splitHandsCb) splitHandsCb.checked = true;
       if (detectTempoCb) detectTempoCb.checked = true;
-      if (detectKeyCb) detectKeyCb.checked = true;
-      if (enableRubato) enableRubato.checked = true;
-      if (enableTriplets) enableTriplets.checked = true;
-      if (thresholdSlider) thresholdSlider.value = 0.55;
-      setHarmonicFilterValue('classical');
-      if (qsSlider) qsSlider.value = 0.5;
-    } else if (presetName === 'jazz') {
-      setTranscriberValue('piano_transcription');
-      if (useDemucsCb) useDemucsCb.checked = false;
-      setQuantizationValue('heavy');
-      if (removeShortCb) removeShortCb.checked = false;
-      if (minNoteInput) minNoteInput.value = 20;
-      if (mergeNearCb) mergeNearCb.checked = false;
-      if (mergeGapInput) mergeGapInput.value = 10;
-      if (splitHandsCb) splitHandsCb.checked = true;
-      if (detectTempoCb) detectTempoCb.checked = true;
+      if (detectMeterCb) detectMeterCb.checked = true;
       if (detectKeyCb) detectKeyCb.checked = true;
       if (enableRubato) enableRubato.checked = false;
       if (enableTriplets) enableTriplets.checked = false;
-      if (thresholdSlider) thresholdSlider.value = 0.67;
+      if (showPedalCb) showPedalCb.checked = false;
+      if (showChordsCbToggle) showChordsCbToggle.checked = false;
+      if (thresholdSlider) thresholdSlider.value = 0.55;
+      if (qsSlider) qsSlider.value = 0.5;
       setHarmonicFilterValue('off');
     } else if (presetName === 'precision') {
       // Transkun + filtrage harmonique Transkun v2 (agressif) — optimal pour classique complexe
-      setTranscriberValue('transkun');
-      if (useDemucsCb) useDemucsCb.checked = true;
+      setTranscriberValue('piano_transcription');
+      if (useDemucsCb) useDemucsCb.checked = false;
       setQuantizationValue('heavy');
       if (removeShortCb) removeShortCb.checked = false;
       if (mergeNearCb) mergeNearCb.checked = false;
       if (splitHandsCb) splitHandsCb.checked = true;
       if (detectTempoCb) detectTempoCb.checked = true;
+      if (detectMeterCb) detectMeterCb.checked = true;
       if (detectKeyCb) detectKeyCb.checked = true;
       if (enableRubato) enableRubato.checked = true;
       if (enableTriplets) enableTriplets.checked = true;
+      if (showPedalCb) showPedalCb.checked = false;
+      if (showChordsCbToggle) showChordsCbToggle.checked = false;
       if (thresholdSlider) thresholdSlider.value = 0.33;
+      if (qsSlider) qsSlider.value = 0.5;
       // Utiliser le filtrage harmonique Transkun v2 (agressif) — élimine les notes en trop
-      setHarmonicFilterValue('transkun');
+      setHarmonicFilterValue('transkun-chord');
       if (qsSlider) qsSlider.value = 0.90;
-    } else if (presetName === 'ultra-classique') {
-      // Grille 1/16 beat, snap très doux (0.08), zéro fusion — idéal pour Chopin/Debussy
+    } else if (presetName === 'classique') {
       setTranscriberValue('piano_transcription');
-      if (useDemucsCb) useDemucsCb.checked = true;
-      setQuantizationValue('ultra-classique');
-      if (removeShortCb) removeShortCb.checked = false;
-      if (mergeNearCb) mergeNearCb.checked = false;  // zéro fusion
-      if (mergeGapInput) mergeGapInput.value = 5;
-      if (splitHandsCb) splitHandsCb.checked = true;
-      if (detectTempoCb) detectTempoCb.checked = true;
-      if (detectKeyCb) detectKeyCb.checked = true;
-      if (enableRubato) enableRubato.checked = true;
-      if (enableTriplets) enableTriplets.checked = true;
-      if (thresholdSlider) thresholdSlider.value = 0.30;  // haute sensibilité
-      setHarmonicFilterValue('ultra');  // maximum pour notes en trop
-      if (qsSlider) qsSlider.value = 0.5;
-    } else if (presetName === 'classique-soft') {
-      // Snap ultra-doux (0.08) — transcription déjà précise
-      setTranscriberValue('piano_transcription');
-      if (useDemucsCb) useDemucsCb.checked = true;
-      setQuantizationValue('classique-soft');
+      if (useDemucsCb) useDemucsCb.checked = false;
+      setQuantizationValue('light');
       if (removeShortCb) removeShortCb.checked = false;
       if (mergeNearCb) mergeNearCb.checked = false;
-      if (mergeGapInput) mergeGapInput.value = 5;
       if (splitHandsCb) splitHandsCb.checked = true;
       if (detectTempoCb) detectTempoCb.checked = true;
+      if (detectMeterCb) detectMeterCb.checked = true;
       if (detectKeyCb) detectKeyCb.checked = true;
       if (enableRubato) enableRubato.checked = true;
       if (enableTriplets) enableTriplets.checked = true;
-      if (thresholdSlider) thresholdSlider.value = 0.35;
-      setHarmonicFilterValue('ultra');
-      if (qsSlider) qsSlider.value = 0.5;
-    } else if (presetName === 'transkun') {
-      // Optimisé pour le modèle Transkun — snap moyen (0.20), grille 1/16
-      setTranscriberValue('transkun');
-      if (useDemucsCb) useDemucsCb.checked = true;
-      setQuantizationValue('transkun');
-      if (removeShortCb) removeShortCb.checked = false;
-      if (mergeNearCb) mergeNearCb.checked = false;
-      if (mergeGapInput) mergeGapInput.value = 5;
-      if (splitHandsCb) splitHandsCb.checked = true;
-      if (detectTempoCb) detectTempoCb.checked = true;
-      if (detectKeyCb) detectKeyCb.checked = true;
-      if (enableRubato) enableRubato.checked = true;
-      if (enableTriplets) enableTriplets.checked = true;
+      if (showPedalCb) showPedalCb.checked = false;
+      if (showChordsCbToggle) showChordsCbToggle.checked = false;
       if (thresholdSlider) thresholdSlider.value = 0.33;
-      setHarmonicFilterValue('transkun');
-      if (qsSlider) qsSlider.value = 0.6;  // snap moyen
+      if (qsSlider) qsSlider.value = 1;
+      setHarmonicFilterValue('classical');
+	} else if (presetName === 'jazz') {
+      setTranscriberValue('piano_transcription');
+      if (useDemucsCb) useDemucsCb.checked = false;
+      setQuantizationValue('heavy');
+      if (removeShortCb) removeShortCb.checked = false;
+      if (minNoteInput) minNoteInput.value = 20;
+      if (mergeNearCb) mergeNearCb.checked = false;
+      if (mergeGapInput) mergeGapInput.value = 10;
+      if (splitHandsCb) splitHandsCb.checked = true;
+      if (detectTempoCb) detectTempoCb.checked = true;
+      if (detectMeterCb) detectMeterCb.checked = true;
+      if (detectKeyCb) detectKeyCb.checked = true;
+      if (enableRubato) enableRubato.checked = false;
+      if (enableTriplets) enableTriplets.checked = false;
+      if (showPedalCb) showPedalCb.checked = false;
+      if (showChordsCbToggle) showChordsCbToggle.checked = true;
+      if (thresholdSlider) thresholdSlider.value = 0.67;
+      if (qsSlider) qsSlider.value = 0.5;
+      setHarmonicFilterValue('off');
     }
 
     const display = document.getElementById('threshold-display');
@@ -839,7 +794,7 @@ async function startTranscription(file) {
    }
    
    formData.append('time_sig', document.getElementById('time-sig')?.value || '4/4');
-  formData.append('key_sig', document.getElementById('key-sig-toolbar')?.value || 'C');
+   formData.append('key_sig', document.getElementById('key-sig-upload')?.value || document.getElementById('key-sig-toolbar')?.value || 'C');
 
   const tempoOverride = document.getElementById('tempo-override')?.value;
   if (tempoOverride) formData.append('tempo', tempoOverride);
@@ -992,9 +947,13 @@ function handleTranscriptionResult(result) {
   sleep(400).then(() => {
     showSection('score');
 
-    const detectedKey = score_data.keySignature || 'C';
+  const detectedKey = score_data.keySignature;
+    const detectKeyCb = document.getElementById('detect-key');
+    const useManualKey = detectKeyCb && !detectKeyCb.checked;
     const keySigToolbar = document.getElementById('key-sig-toolbar');
-    if (keySigToolbar) keySigToolbar.value = detectedKey;
+    if (keySigToolbar && !useManualKey && detectedKey) {
+      keySigToolbar.value = detectedKey;
+    }
 
     if (renderer) {
       const showPedalCb = document.getElementById('show-pedal');
@@ -1153,21 +1112,35 @@ function initTempoSlider(detectedTempo) {
    ═══════════════════════════════════════════════════════════════════════════ */
 function updateDetectedMeter(detectedMeter) {
   const [num, den] = detectedMeter;
+
   const timeSigSelect = document.getElementById('time-sig');
   const badge = document.getElementById('meter-auto-badge');
+  const detectMeterCb = document.getElementById('detect-meter');
 
-  if (timeSigSelect) {
-    const targetVal = `${num}/${den}`;
-    const hasOption = Array.from(timeSigSelect.options).some(o => o.value === targetVal);
-    if (hasOption) {
-      // Toujours mettre à jour la valeur détectée
-      timeSigSelect.value = targetVal;
-      // Afficher le badge si la détection est active
-      if (detectMeterCb && detectMeterCb.checked) {
-        if (badge) badge.style.display = 'inline';
-      }
-    }
+  if (!timeSigSelect) return;
+
+  const targetVal = `${num}/${den}`;
+
+  const hasOption = Array.from(timeSigSelect.options)
+      .some(o => o.value === targetVal);
+
+  if (!hasOption) return;
+
+  // Détection désactivée : ne rien modifier
+  if (!detectMeterCb?.checked) {
+      if (badge) badge.style.display = 'none';
+      return;
   }
+
+  // L'utilisateur a choisi une mesure manuellement : respecter son choix
+  if (timeSigSelect.dataset.userOverride === 'true') {
+      if (badge) badge.style.display = 'none';
+      return;
+  }
+
+  timeSigSelect.value = targetVal;
+
+  if (badge) badge.style.display = 'inline';
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

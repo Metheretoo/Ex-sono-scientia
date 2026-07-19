@@ -131,11 +131,29 @@ def filter_stable_key_changes(local_keys: List[tuple], min_confirmations: int = 
     Filtre les changements de tonalité instables.
     Un changement n'est validé que s'il est confirmé sur N fenêtres consécutives.
     
+    CORRECTION BUG #6 : 
+    - Augmenter min_confirmations à 3 pour éviter les changements intempestifs.
+    - Préserver la tonalité majoritaire (par nombre de fenêtres) comme tonalité globale.
+    
     Évite les fausses armures dues à des chromatismes passagers.
     """
     if not local_keys:
         return []
 
+    # ── 1. Compter le nombre de fois où chaque tonalité apparaît ────────────
+    key_counts = {}
+    for _, key_name in local_keys:
+        key_counts[key_name] = key_counts.get(key_name, 0) + 1
+    
+    # Tonalité la plus fréquente = tonalité dominante
+    dominant_key = max(key_counts, key=key_counts.get)
+    dominant_count = key_counts[dominant_key]
+    
+    # Si la tonalité dominante est nettement majoritaire (> 50%), on la garde seule
+    if dominant_count > len(local_keys) * 0.5:
+        return [(local_keys[0][0], dominant_key)]
+    
+    # Sinon, on applique le filtrage de stabilité classique
     stable   = [local_keys[0]]
     run_key  = local_keys[0][1]
     count    = 1
@@ -150,6 +168,10 @@ def filter_stable_key_changes(local_keys: List[tuple], min_confirmations: int = 
         if count >= min_confirmations and key_name != stable[-1][1]:
             stable.append((beat_pos, key_name))
 
+    # S'assurer que la première entrée est la tonalité dominante
+    if stable and stable[0][1] != dominant_key:
+        stable[0] = (stable[0][0], dominant_key)
+    
     return stable
 
 

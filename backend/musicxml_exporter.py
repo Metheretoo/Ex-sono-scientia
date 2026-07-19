@@ -3,6 +3,30 @@ from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
+def _key_to_fifths(key):
+    """
+    Conversion tonalité MusicXML.
+    """
+    table = {
+        "C": 0,
+        "G": 1,
+        "D": 2,
+        "A": 3,
+        "E": 4,
+        "B": 5,
+        "F#": 6,
+        "C#": 7,
+
+        "F": -1,
+        "Bb": -2,
+        "Eb": -3,
+        "Ab": -4,
+        "Db": -5,
+        "Gb": -6,
+        "Cb": -7,
+    }
+
+    return table.get(key.replace("m", ""), 0)
 
 def _escape_xml(text: str) -> str:
     """Échappe les caractères XML."""
@@ -143,7 +167,12 @@ def export_musicxml(score_data: Dict[str, Any], output_path: str):
             # Clef de sol
             xml_parts.append('      <attributes>')
             xml_parts.append('        <divisions>' + _duration_to_musicxml(1.0) + '</divisions>')
-            xml_parts.append('        <keys><key f="0" mode="' + key_mode + '" step="C"/></keys>')
+            fifths = _key_to_fifths(key_sig)
+
+            xml_parts.append('        <key>')
+            xml_parts.append(f'          <fifths>{fifths}</fifths>')
+            xml_parts.append(f'          <mode>{key_mode}</mode>')
+            xml_parts.append('        </key>')
             xml_parts.append('        <time><beats>' + str(ts_num) + '</beats><beat-type>' + str(ts_den) + '</beat-type></time>')
             xml_parts.append('        <clef>')
             xml_parts.append('          <sign>G</sign>')
@@ -158,17 +187,22 @@ def export_musicxml(score_data: Dict[str, Any], output_path: str):
             xml_parts.append('        </clef>')
             xml_parts.append('      </attributes>')
         
-        # Changement d'armure
+        # Changement d'armure (uniquement si la tonalité DIFFÈRE de la mesure précédente)
         if m_idx in key_changes:
             root, mode = key_changes[m_idx]
-            alter = 0
-            if root in ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb']:
-                alter = -1
-            elif root in ['G', 'D', 'A', 'E', 'B', 'F#', 'C#']:
-                alter = 1
-            xml_parts.append('      <attributes>')
-            xml_parts.append('        <keys><key f="' + str(alter) + '" mode="' + mode + '" step="' + root + '"/></keys>')
-            xml_parts.append('      </attributes>')
+            # Ne pas ajouter si c'est le même key/fifths que l'armure initiale (m_idx == 0)
+            # ou identique à la mesure précédente
+            prev_key = key_changes.get(m_idx - 1, (None, None))[0] if m_idx > 0 else key_sig
+            if root == prev_key:
+                pass  # même tonalité que mesure précédente → ne pas dupliquer
+            else:
+                fifths = _key_to_fifths(root)
+                xml_parts.append('      <attributes>')
+                xml_parts.append('        <key>')
+                xml_parts.append(f'          <fifths>{fifths}</fifths>')
+                xml_parts.append(f'          <mode>{mode}</mode>')
+                xml_parts.append('        </key>')
+                xml_parts.append('      </attributes>')
         
         # Pédales
         if m_idx in pedal_by_measure:

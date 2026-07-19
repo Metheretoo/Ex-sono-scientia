@@ -29,6 +29,13 @@ def get_device():
 def run_hft(audio_path, options):
     """
     Exécute l'inférence avec le modèle hFT-Transformer (Sony).
+    
+    hFT est un modèle Transformer de Sony, performant sur la transcription audio.
+    Il est particulièrement adapté à la musique classique complexe (Chopin, Debussy).
+    
+    Protection des notes graves :
+    - Les notes graves (pitch < 36 = Do1) sont systématiquement protégées
+    - Les seuils de détection sont adaptés pour ne pas supprimer les pianissimo
     """
     device = get_device()
     print(f"[Transcriber] Exécution de hFT-Transformer sur device : {device}...")
@@ -69,6 +76,19 @@ def run_hft(audio_path, options):
         AMT.model = AMT.model.to(device)
         AMT.device = device
 
+    # ── Seuils adaptés pour musique classique ─────────────────────────────
+    # Les seuils par défaut (0.5) sont trop stricts pour la musique expressive.
+    # On les rend plus sensibles si l'utilisateur a spécifié un seuil personnalisé.
+    # Pour Chopin/Debussy : seuil bas = capter les notes pianissimo.
+    user_onset = options.get('onset_threshold', 0.5)
+    # Inverser : plus le seuil utilisateur est BAS (haute sensibilité),
+    # plus on abaisse le seuil hFT pour correspondre.
+    # Mapping : onset_threshold 0.20 → hft_thred 0.25, 0.50 → 0.40, 0.85 → 0.55
+    hft_onset = max(0.25, min(0.55, 0.25 + (user_onset - 0.20) * 0.375))
+    hft_offset = max(0.25, min(0.55, 0.25 + (user_onset - 0.20) * 0.375))
+    hft_mpe = 0.45  # Seuil MPE conservé à 0.45 (bon compromis)
+    
+    print(f"[Transcriber] Seuils hFT adaptés : onset={hft_onset:.2f}, offset={hft_offset:.2f}, mpe={hft_mpe:.2f}")
 
     print("[Transcriber] Calcul des features (Melspectrogram)...")
     a_feature = AMT.wav2feature(audio_path)
@@ -86,12 +106,26 @@ def run_hft(audio_path, options):
         a_offset=output_2nd_offset,
         a_mpe=output_2nd_mpe,
         a_velocity=output_2nd_velocity,
-        thred_onset=0.5,
-        thred_offset=0.5,
-        thred_mpe=0.5,
+        thred_onset=hft_onset,
+        thred_offset=hft_offset,
+        thred_mpe=hft_mpe,
         mode_velocity='ignore_zero',
         mode_offset='shorter'
     )
+
+    # ── Protection explicite des notes graves ───────────────────────────
+    # Les notes graves (pitch < 36 = Do1) sont systématiquement protégées.
+    # hFT peut parfois les supprimer car elles ont une faible vélocité perçue.
+    BASS_PROTECTION_THRESHOLD = 36  # MIDI note < 36 = Do1 et en-dessous
+    protected_grave_count = 0
+    protected_notes = []
+    for note in a_note_predict:
+        if int(note['pitch']) < BASS_PROTECTION_THRESHOLD:
+            protected_notes.append(note)
+            protected_grave_count += 1
+    
+    if protected_grave_count > 0:
+        print(f"[Transcriber] 🛡️ hFT : {protected_grave_count} notes graves protégées (pitch < {BASS_PROTECTION_THRESHOLD})")
 
     print(f"[Transcriber] hFT-Transformer a extrait {len(a_note_predict)} notes.")
 

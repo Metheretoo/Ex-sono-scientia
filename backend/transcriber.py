@@ -1295,8 +1295,11 @@ class TranscriptionPipeline:
             harmonic_ctx = build_harmonic_context(slices)
 
             if options.get('detect_key', True):
-                key_name = harmonic_ctx.global_key
+                key_name = harmonic_ctx.global_key or options.get('key_sig', 'C')
                 print(f"[Pipeline] <<< Tonalité détectée: {key_name}", flush=True)
+            else:
+                key_name = options.get('key_sig', 'C')
+                print(f"[Pipeline] <<< Tonalité manuelle respectée: {key_name}", flush=True)
         except Exception as e:
             # P1.2 : Erreur critique en mode strict (harmonie nécessaire pour split LH/MD)
             if strict_mode:
@@ -1340,12 +1343,15 @@ class TranscriptionPipeline:
         show_chords = options.get('chord_symbols', True) or (preset == 'jazz')
 
         score_options = {
-            'detect_key': False,
+            'detect_key': options.get('detect_key', True),  # Conserver la valeur originale de detect_key
             'time_sig': time_signature,
             'display_bpm': display_bpm,
             'write_chord_symbols': show_chords,
             'detect_dynamics': True,
         }
+        
+        # [DEBUG] Confirmer que detect_key et key_sig sont bien transmis
+        print(f"[Pipeline DEBUG] detect_key={options.get('detect_key', True)} | key_sig={options.get('key_sig', 'C')} | score_options={score_options}")
 
         pedal_beats_list = []
         if pedal_intervals:
@@ -1359,9 +1365,13 @@ class TranscriptionPipeline:
         if uncertain_note_ids:
             print(f"[Pipeline] {len(uncertain_note_ids)} notes marquées comme 'incertaines' (P6)")
 
+        # CORRECTION BUG TONALITÉ : passer la tonalité MANUELLE (options.get('key_sig'))
+        # au lieu de key_name (détection harmonique). build_score() choisira ensuite :
+        # - si detect_key=True : lance le détecteur Krumhansl-Schmuckler
+        # - si detect_key=False : utilise key_sig tel quel (la tonalité manuelle)
         score_data = build_score(
             voices, tm,
-            key_sig=key_name,
+            key_sig=options.get('key_sig', 'C'),  # ← tonalité manuelle de l'UI
             options=score_options,
             harmonic_ctx=harmonic_ctx,
             pedals=pedal_beats_list,

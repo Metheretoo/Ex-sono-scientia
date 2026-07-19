@@ -27,28 +27,6 @@ MINOR_PROFILE = [
     4.57, 2.48, 3.70, 4.77, 3.18, 2.30
 ]
 
-def merge_key_results(midi_result, audio_result):
-
-    if (
-        midi_result["key"] == audio_result["key"]
-        and
-        midi_result["mode"] == audio_result["mode"]
-    ):
-        midi_result["confidence"] = min(
-            midi_result["confidence"] + 0.15,
-            1.0
-        )
-
-        midi_result["source"] = "midi+audio"
-
-        return midi_result
-
-
-    # En cas de désaccord :
-    # on garde MIDI car c'est ton pipeline principal
-    midi_result["source"] = "midi"
-
-    return midi_result
 
 def _normalize_vector(v: np.ndarray) -> np.ndarray:
     """Normalise un vecteur à la norme L2."""
@@ -144,7 +122,7 @@ def detect_key_mode(
     # ── 1. FFT ──
     n_fft = 4096
     magnitudes = np.abs(
-        librosa.feature.chroma_cqt(audio_segment[:n_fft])
+        np.fft.rfft(audio_segment[:n_fft])
     )
     
     # ── 2. Lissage ──
@@ -194,34 +172,49 @@ def detect_key_mode(
 
 
 def detect_key_from_audio(
-    audio_path,
-    sr=22050
-):
-
-    import librosa
-
-    y, sr = librosa.load(
-        audio_path,
-        sr=sr,
-        mono=True
-    )
-
-
-    chroma = librosa.feature.chroma_cqt(
-        y=y,
-        sr=sr
-    )
-
-
-    chroma_mean = np.mean(
-        chroma,
-        axis=1
-    )
-
-
-    return detect_key_from_chroma(
-        chroma_mean
-    )
+    audio_path: str,
+    segment_duration: float = 10.0,
+    sr: int = 22050
+) -> Dict:
+    """
+    Détecte la tonalité depuis un fichier audio.
+    
+    Args:
+        audio_path: Chemin vers le fichier audio
+        segment_duration: Durée du segment à analyser (sec)
+        sr: Sample rate
+    
+    Returns:
+        Dict avec key, mode, confidence, profile
+    """
+    try:
+        import soundfile as sf
+        audio, file_sr = sf.read(
+            audio_path,
+            start=0,
+            duration=segment_duration,
+            dtype='float32'
+        )
+        
+        # Convertir en mono si stéréo
+        if len(audio.shape) > 1:
+            audio = audio.mean(axis=1)
+        
+        # Resample si nécessaire
+        if file_sr != sr:
+            import librosa
+            audio = librosa.resample(audio, file_sr, sr)
+        
+        return detect_key_mode(audio, sr)
+    
+    except ImportError:
+        # Fallback: retourne C major par défaut
+        return {
+            "key": "C",
+            "mode": "major",
+            "confidence": 0.0,
+            "profile": [0.0] * 12
+        }
 
 
 def detect_tonality(note_events, audio_path=None, sr=22050):
@@ -240,21 +233,7 @@ def detect_tonality(note_events, audio_path=None, sr=22050):
     """
     # Si des notes MIDI sont fournies, les utiliser pour la détection
     if note_events and len(note_events) > 0:
-
-        midi_result = detect_key_from_notes(note_events)
-
-        if audio_path:
-            audio_result = detect_key_from_audio(
-                audio_path,
-                sr=sr
-            )
-
-            return merge_key_results(
-                midi_result,
-                audio_result
-            )
-
-        return midi_result
+        return detect_key_from_notes(note_events)
     
     # Fallback: utiliser le fichier audio
     if audio_path:
@@ -288,45 +267,17 @@ def detect_key_from_notes(note_events):
     # Compter les pitch classes (notes sans octave)
     pitch_class_counts = [0] * 12
     for event in note_events:
-
-        duration = 1.0
-        velocity = 80
-
         if isinstance(event, dict):
-            midi_note = event.get(
-                'midi_note',
-                event.get('pitch_midi', 0)
-            )
-            duration = event.get(
-                'duration',
-                event.get('duration_sec', 1.0)
-            )
-            velocity = event.get(
-                'velocity',
-                80
-            )
-
+            midi_note = event.get('midi_note', event.get('pitch_midi', 0))
         elif isinstance(event, (list, tuple)):
+            # Format V3 : (onset_sec, pitch_midi, duration_sec, velocity)
             midi_note = int(event[1])
-
-            # format probable :
-            # onset, pitch, duration, velocity
-            if len(event) > 2:
-                duration = float(event[2])
-
-            if len(event) > 3:
-                velocity = float(event[3])
-
         else:
             continue
-
-
+        
+        # Extraire la pitch class (note dans une octave)
         pc = int(midi_note) % 12
-
-        # poids harmonique
-        weight = duration * (velocity / 127)
-
-        pitch_class_counts[pc] += weight
+        pitch_class_counts[pc] += 1
     
     # Normaliser le vecteur
     total = sum(pitch_class_counts)
