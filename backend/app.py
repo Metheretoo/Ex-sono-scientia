@@ -56,6 +56,7 @@ def _init_pydantic_models():
             split_hands: bool = False
             enable_rubato: bool = False
             enable_triplets: bool = False
+            enable_smooth: bool = False  # Smooth : BPM ×2 + simplification rythmique
             quantization_sensitivity: Optional[float] = Field(default=None, ge=0.0, le=1.0)
             # Méthodes de filtrage harmonique disponibles :
             #   basic       — octave + quinte uniquement (léger)
@@ -413,6 +414,7 @@ def transcribe():
         'split_hands': request.form.get('split_hands', 'false') == 'true',
         'enable_rubato': request.form.get('enable_rubato', 'false') == 'true',
         'enable_triplets': request.form.get('enable_triplets', 'false') == 'true',
+        'enable_smooth': request.form.get('enable_smooth', 'false') == 'true',  # Smooth : BPM ×2 + simplification rythmique
         'quantization_sensitivity': request.form.get('quantization_sensitivity'),
         'harmonic_filter': request.form.get('harmonic_filter', 'classical-strong'),  # défaut: classical-strong pour Chopin/Nocturnes/Mazurkas
         'strict_mode': request.form.get('strict_mode', 'false') == 'true',

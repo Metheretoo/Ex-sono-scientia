@@ -657,6 +657,28 @@ input[type="file"] { display: none; }
   box-shadow: 0 0 8px var(--violet-glow);
 }
 
+/* Bouton d'enharmonie (♯/♭) */
+.enharmonic-btn {
+  background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(245,158,11,0.05));
+  border-color: var(--gold);
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.enharmonic-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.1));
+  border-color: var(--gold-light);
+  color: var(--gold-light);
+  box-shadow: 0 0 10px rgba(245,158,11,0.3);
+}
+
+.enharmonic-btn.active {
+  background: linear-gradient(135deg, rgba(245,158,11,0.3), rgba(245,158,11,0.15));
+  border-color: var(--gold-light);
+  color: var(--gold-light);
+  box-shadow: 0 0 12px rgba(245,158,11,0.4);
+}
+
 .btn-danger:hover:not(:disabled) {
   background: rgba(239,68,68,0.15);
   border-color: var(--danger);
@@ -799,6 +821,40 @@ input[type="file"] { display: none; }
   flex-direction: column;
   gap: 10px;
   pointer-events: none;
+}
+
+/* ── Toggles d'affichage dans la toolbar ─────────────────────────────────────── */
+.display-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-2);
+  user-select: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  transition: var(--transition);
+}
+
+.display-toggle:hover {
+  background: rgba(124,58,237,0.15);
+  border-color: var(--violet);
+  color: var(--text-1);
+}
+
+.display-toggle input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--violet);
+  cursor: pointer;
+}
+
+.display-toggle span {
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .toast {

@@ -177,6 +177,10 @@
                   <input type="checkbox" id="enable-triplets" />
                   <span>Triolets</span>
                 </label>
+                <label class="checkbox-label-premium" title="Smooth : double le tempo et simplifie le rythme (noires/croches uniquement). Idéal pour une partition plus lisible, surtout pour les débutants.">
+                  <input type="checkbox" id="enable-smooth" />
+                  <span>🎵 Smooth (rythme simplifié)</span>
+                </label>
               </div>
             </div>
 
@@ -262,6 +266,10 @@
     <label class="checkbox-label-premium" title="Affiche/masque les noms d'accords (ex: Cm7, G7) au-dessus de la portée, disponible pour tous les presets, pas seulement Jazz. Ne nécessite pas de relancer la transcription.">
       <input type="checkbox" id="show-chords" checked />
       <span>Noms d'accords</span>
+    </label>
+    <label class="checkbox-label-premium" title="Affiche/masque le nom de la note la plus haute (ex: Sol 5) entre la portée et les accords, pour aider les débutants. Ne nécessite pas de relancer la transcription.">
+      <input type="checkbox" id="show-highest-note" />
+      <span>Note la plus haute</span>
     </label>
   </div>
 </div>
@@ -406,8 +414,9 @@
 
         <div class="tool-group">
           <span class="tool-group-label">Transposer</span>
-          <button id="btn-up" class="tool-btn" title="Monter d'un demi-ton  (↑)">↑ ♯</button>
-          <button id="btn-down" class="tool-btn" title="Descendre d'un demi-ton (↓)">↓ ♭</button>
+          <button id="btn-up" class="tool-btn" title="Monter d'un demi-ton (↑)">↑</button>
+          <button id="btn-down" class="tool-btn" title="Descendre d'un demi-ton (↓)">↓</button>
+          <button id="btn-enharmonic" class="tool-btn enharmonic-btn" title="Changer l'enharmonie (dièse ↔ bémol)">♯/♭</button>
         </div>
 
         <div class="tool-group">
@@ -468,6 +477,22 @@
           <button id="btn-delete" class="tool-btn btn-danger" title="Supprimer la note (Suppr)">🗑</button>
           <button id="btn-undo" class="tool-btn" title="Annuler (Ctrl+Z)" disabled>↩ Annuler</button>
           <button id="btn-redo" class="tool-btn" title="Rétablir (Ctrl+Y)" disabled>↪ Rétablir</button>
+        </div>
+
+        <div class="tool-group tool-group-display">
+          <span class="tool-group-label">Affichage</span>
+          <label class="display-toggle" title="Affiche/masque les noms d'accords (ex: Cm7, G7) au-dessus de la portée">
+            <input type="checkbox" id="show-chords-toolbar" checked />
+            <span>Accords</span>
+          </label>
+          <label class="display-toggle" title="Affiche/masque les annotations de pédale forte (Ped. / *)">
+            <input type="checkbox" id="show-pedal-toolbar" checked />
+            <span>Pédale</span>
+          </label>
+          <label class="display-toggle" title="Affiche/masque le nom de la note la plus haute (ex: Sol 5) au-dessus de la portée">
+            <input type="checkbox" id="show-highest-note-toolbar" />
+            <span>Note la plus haute</span>
+          </label>
         </div>
 
         <div class="tool-group tool-group-play">
@@ -560,10 +585,10 @@
   <!-- ══ Scripts ════════════════════════════════════════════════════════════════ -->
   <script src="/js/lib/soundfont-player.min.js"></script>
   <script src="/js/lib/vexflow.js"></script>
-  <script src="/js/renderer.js?v=17"></script>
-  <script src="/js/editor.js?v=17"></script>
+<script src="/js/renderer.js?v=19"></script>
+<script src="/js/editor.js?v=19"></script>
   <script src="/static/js/ScorePlayer.js?v=13"></script>
-<script src="/static/js/app.js?v=18"></script>
+<script src="/static/js/app.js?v=20"></script>
 
 </body>
 

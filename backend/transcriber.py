@@ -1378,6 +1378,18 @@ class TranscriptionPipeline:
             uncertain_note_ids=uncertain_note_ids,  # [P6]
         )
 
+        # ── [SMOOTH] Simplification rythmique + BPM ×2 ───────────────────────
+        enable_smooth = options.get('enable_smooth', False)
+        if enable_smooth:
+            _cb('smooth', 'Simplification rythmique (Smooth)...', 0.88)
+            print("[Pipeline] >>> Smooth mode actif : simplification rythmique...", flush=True)
+            try:
+                from rhythm_simplifier import simplify_rhythm
+                score_data = simplify_rhythm(score_data)
+                print("[Pipeline] <<< Simplification rythmique terminée", flush=True)
+            except Exception as e:
+                print(f"[Pipeline] ⚠ rhythm_simplifier indisponible ({e})", flush=True)
+
         score_data.setdefault('metadata', {})['warnings'] = pipeline_warnings.warnings()
 
         # ── 2.5 [P3.5] Transmettre métadonnées TempoMap au score_data ───────

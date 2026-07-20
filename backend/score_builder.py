@@ -198,14 +198,47 @@ def build_score(
             if n.beat_position >= m_start and n.beat_position < m_end
         ]
 
-        measures.append({
+        measure_data = {
             'treble': build_voice_vexflow(
                 treble_in_measure, m_start, beats_per_measure, 'treble', key_sig
             ),
             'bass': build_voice_vexflow(
                 bass_in_measure, m_start, beats_per_measure, 'bass', key_sig
             ),
-        })
+            # m_start: position absolue du début de cette mesure en beats (pour le frontend)
+            'm_start': m_start,
+        }
+
+        # ── Note la plus haute de la main droite (pour aider les débutants) ─
+        # Pour CHAQUE NOTE de la main droite qui commence dans cette mesure,
+        # on détecte si c'est la note la plus haute parmi toutes les notes
+        # de la main droite de TOUTE la partition à ce moment-là.
+        pitch_names = ['Do', 'Do♯', 'Ré', 'Ré♯', 'Mi', 'Fa', 'Fa♯', 'Sol', 'Sol♯', 'La', 'La♯', 'Si']
+        
+        # Notes de la main droite qui commencent DANS cette mesure
+        treble_in_measure = [
+            n for n in voices.treble
+            if n.beat_position >= m_start and n.beat_position < m_end
+        ]
+        treble_sounding = [n for n in treble_in_measure if not getattr(n, 'is_rest', False)]
+        
+        highest_notes_per_beat = []
+        if treble_sounding:
+            for note in treble_sounding:
+                note_name = pitch_names[note.pitch_midi % 12]
+                highest_notes_per_beat.append({
+                    'beatInMeasure': round(note.beat_position - m_start, 3),
+                    'midiPitch': note.pitch_midi,
+                    'noteName': note_name
+                })
+        
+        measure_data['highestNotes'] = highest_notes_per_beat
+        
+        # Debug : vérifier que highestNotes est bien peuplé
+        if highest_notes_per_beat:
+            print(f"[ScoreBuilder DEBUG] Mesure {m_idx + 1}: {len(highest_notes_per_beat)} notes aigües, m_start={m_start:.3f}", flush=True)
+
+        measures.append(measure_data)
 
     # [P3.5] Construire les mesures avec information downbeat
     # Convertir downbeat_times_beats en indices de mesure pour le JSON
@@ -474,56 +507,199 @@ def midi_to_vexflow_key(pitch: int, key_sig: str = 'C') -> str:
     """
     MIDI pitch → clé VexFlow (ex: 60 → 'c/4', 61 → 'c#/4').
     
-    Cette fonction map le MIDI pitch au nom de note JUSTE (avec dièse/bémol
-    correct). Les altérations de l'armure sont GÉRÉES SÉPARÉMENT par le champ
-    keySignature du score.
+    Cette fonction map le MIDI pitch au nom de note avec l'altération correcte
+    EN FONCTION de l'armure. Les altérations sont calculées pour que la note
+    soit correcte musicalement par rapport à l'armure donnée.
+    
+    Principe :
+    - L'armure VexFlow (keySignature) altère certaines notes automatiquement
+    - Cette fonction doit retourner la note de base + l'altération qui,
+      combinée à l'armure, donne la note désirée
+    - Ex: armure F (Si♭) + note Si naturel → retourne 'b/X:n' (bécarre)
     
     Exemples :
-    - MIDI 60 (C4) → 'c/4'
-    - MIDI 61 (C#/Db) → 'c#/4' (dièse par défaut)
-    - MIDI 62 (D) → 'd/4'
-    - MIDI 63 (D#/Eb) → 'db/4' (bémol par défaut pour l'énharmonie)
-    - MIDI 64 (E) → 'e/4'
-    
-    IMPORTANT : Cette fonction NE doit PAS appliquer l'armure. Elle retourne
-    le nom de note basé uniquement sur le pitch MIDI.
+    - Armure C : MIDI 60 (C4) → 'c/4' (pas d'altération)
+    - Armure F (1♭=Si♭) : MIDI 71 (Si naturel) → 'b/4:n' (bécarre annule le ♭)
+    - Armure F (1♭=Si♭) : MIDI 70 (Si♭) → 'b/4:b' (bémol renforce le ♭)
+    - Armure G (1#=Fa#) : MIDI 65 (Fa naturel) → 'f/4:n' (bécarre annule le #)
+    - Armure G (1#=Fa#) : MIDI 66 (Fa#) → 'f/4:#' (dièse renforce le #)
     """
     pitch_class = pitch % 12
     
-    # Mapping MIDI pitch class → nom de note VexFlow avec dièse/bémol
-    # Utilise les dièses par défaut, bémols pour les notes enharmones courantes
-    CLASS_TO_NAME = {
-        0: 'c',    # C
-        1: 'c#',   # C#/Db
-        2: 'd',    # D
-        3: 'd#',   # D#/Eb → db en notation bémol
-        4: 'e',    # E
-        5: 'f',    # F
-        6: 'f#',   # F#/Gb → gb en notation bémol
-        7: 'g',    # G
-        8: 'g#',   # G#/Ab → ab en notation bémol
-        9: 'a',    # A
-        10: 'a#',  # A#/Bb → bb en notation bémol
-        11: 'b',   # B
-    }
-    
-    base_name = CLASS_TO_NAME[pitch_class]
-    
-    # Retourner la note avec l'octave VexFlow
     # VexFlow octave : c/4 = MIDI 60 (C4 = Do central)
     vexflow_octave = (pitch // 12) - 1
     
-    return f"{base_name}/{vexflow_octave}"
+    # Mapping pitch_class → nom de note VexFlow de base
+    # C=0, D=2, E=4, F=5, G=7, A=9, B=11 (intervalles en demi-tons)
+    NOTE_TO_DEGREE = {'c': 0, 'd': 2, 'e': 4, 'f': 5, 'g': 7, 'a': 9, 'b': 11}
+    
+    # Mapping pitch_class → nom de note avec DIÈSES (pour armures à dièses)
+    # Les notes enharmones utilisent des dièses : Db→C#, Eb→D#, Gb→F#, Ab→G#, Bb→A#
+    PITCH_TO_NAME_SHARP = {
+        0: 'c', 1: 'c#', 2: 'd', 3: 'd#', 4: 'e', 5: 'f',
+        6: 'f#', 7: 'g', 8: 'g#', 9: 'a', 10: 'a#', 11: 'b'
+    }
+    
+    # Mapping pitch_class → nom de note avec BÉMOLS (pour armures à bémols)
+    # Les notes enharmones utilisent des bémols : C#→Db, D#→Eb, F#→Gb, G#→Ab, A#→Bb
+    PITCH_TO_NAME_FLAT = {
+        0: 'c', 1: 'db', 2: 'd', 3: 'eb', 4: 'e', 5: 'f',
+        6: 'gb', 7: 'g', 8: 'ab', 9: 'a', 10: 'bb', 11: 'b'
+    }
+    
+    # Mapping complet des armures → notes altérées
+    # Format: (mode, tonic_normalized) → (alt_type, set de pitch_class altérés)
+    # alt_type: 'sharp' = dièse, 'flat' = bémol
+    
+    # Ordre des altérations par armure
+    SHARP_KEY_SIG = {
+        # Majeures avec dièses
+        ('major', 'g'): 1,            # G: 1# (F#)
+        ('major', 'd'): 2,            # D: 2# (F# C#)
+        ('major', 'a'): 3,            # A: 3# (F# C# G#)
+        ('major', 'e'): 4,            # E: 4# (F# C# G# D#)
+        ('major', 'b'): 5,            # B: 5# (F# C# G# D# A#)
+        ('major', 'f#'): 6,           # F#: 6# (F# C# G# D# A# E#)
+        ('major', 'c#'): 7,           # C#: 7#
+        # Mineures avec dièses (relative majeure)
+        ('minor', 'e'): 1,            # Em: relative de G
+        ('minor', 'b'): 2,            # Bm: relative de D
+        ('minor', 'f#'): 3,           # F#m: relative de A
+        ('minor', 'c#'): 4,           # C#m: relative de E
+        ('minor', 'g#'): 5,           # G#m: relative de B
+        ('minor', 'd#'): 6,           # D#m: relative de F#
+        ('minor', 'a#'): 7,           # A#m: relative de C#
+    }
+    
+    FLAT_KEY_SIG = {
+        # Majeures avec bémols
+        ('major', 'f'): 1,            # F: 1b (Bb)
+        ('major', 'bb'): 2,           # Bb: 2b (Bb Eb)
+        ('major', 'eb'): 3,           # Eb: 3b (Bb Eb Ab)
+        ('major', 'ab'): 4,           # Ab: 4b (Bb Eb Ab Db)
+        ('major', 'db'): 5,           # Db: 5b (Bb Eb Ab Db Gb)
+        ('major', 'gb'): 6,           # Gb: 6b (Bb Eb Ab Db Gb Cb)
+        ('major', 'cb'): 7,           # Cb: 7b
+        # Mineures avec bémols (relative majeure)
+        ('minor', 'd'): 1,            # Dm: relative de F
+        ('minor', 'g'): 2,            # Gm: relative de Bb
+        ('minor', 'c'): 3,            # Cm: relative de Eb
+        ('minor', 'f'): 4,            # Fm: relative de Ab
+        ('minor', 'bb'): 5,           # Bbm: relative de Db
+        ('minor', 'eb'): 6,           # Ebm: relative de Gb
+        ('minor', 'ab'): 7,           # Abm: relative de Cb
+    }
+    
+    # Normaliser l'armure
+    is_minor = key_sig.lower().endswith('m')
+    mode = 'minor' if is_minor else 'major'
+    
+    key_sig_clean = key_sig.lower().rstrip('m')
+    
+    # Déterminer la tonique normalisée
+    if len(key_sig_clean) >= 2 and key_sig_clean[1] in '#b':
+        tonic = key_sig_clean[:2]
+    else:
+        tonic = key_sig_clean[0]
+    
+    # Normaliser la tonique (Bb → bb, Eb → eb, etc.)
+    if len(tonic) == 2 and tonic[1] == '#':
+        tonic = tonic.lower()  # 'f#' → 'f#'
+    elif len(tonic) == 2 and tonic[1] == 'b':
+        tonic = tonic.lower()  # 'bb' → 'bb'
+    
+    # Trouver le type d'armure et le nombre d'altérations
+    num_alts = 0
+    alt_type = 'natural'  # 'natural', 'sharp', 'flat'
+    
+    if mode in ('major', 'minor'):
+        # Chercher dans les armures dièses
+        if (mode, tonic) in SHARP_KEY_SIG:
+            num_alts = SHARP_KEY_SIG[(mode, tonic)]
+            alt_type = 'sharp'
+        # Chercher dans les armures bémols
+        elif (mode, tonic) in FLAT_KEY_SIG:
+            num_alts = FLAT_KEY_SIG[(mode, tonic)]
+            alt_type = 'flat'
+    
+    # Déterminer quelles notes sont altérées
+    # Ordre des altérations dièses: F C G D A E B (pitch_class: 5 0 7 2 9 4 11)
+    SHARP_ORDER = [5, 0, 7, 2, 9, 4, 11]
+    # Ordre des altérations bémols: B E A D G C F (pitch_class: 11 4 9 2 7 0 5)
+    FLAT_ORDER = [11, 4, 9, 2, 7, 0, 5]
+    
+    # Construire les sets de notes altérées
+    sharp_classes = set(SHARP_ORDER[:num_alts]) if alt_type == 'sharp' else set()
+    flat_classes = set(FLAT_ORDER[:num_alts]) if alt_type == 'flat' else set()
+    
+    # ── Calculer l'altération requise ────────────────────────────────────
+    # Choisir le nom de note (dièse ou bémol) selon le type d'armure
+    if alt_type == 'flat':
+        base_name = PITCH_TO_NAME_FLAT[pitch_class]
+    else:
+        # sharp ou natural : utiliser le mapping dièse
+        base_name = PITCH_TO_NAME_SHARP[pitch_class]
+    
+    # La note de base (base_name) a un degré
+    base_degree = NOTE_TO_DEGREE.get(base_name[0], 0)
+    
+    # Différence entre le pitch désiré et la note de base naturelle
+    diff = pitch_class - base_degree  # -1, 0, ou 1
+    
+    # L'armure altère-t-elle cette note ?
+    note_altered_by_key = pitch_class in sharp_classes or pitch_class in flat_classes
+    
+    # Calculer l'altération VexFlow à appliquer
+    if alt_type == 'sharp' and note_altered_by_key:
+        # L'armure met un dièse sur cette note
+        if diff == 0:
+            # Note naturelle désirée → bécarre pour annuler le dièse
+            alter_str = ':n'
+        elif diff == -1:
+            # Note bémol désirée → bémol double (bb + # = naturel, donc bb)
+            alter_str = ':bb'
+        else:  # diff == 1
+            # Note dièse désirée → dièse double
+            alter_str = ':x'
+    elif alt_type == 'flat' and note_altered_by_key:
+        # L'armure met un bémol sur cette note
+        if diff == 0:
+            # Note naturelle désirée → bécarre pour annuler le bémol
+            alter_str = ':n'
+        elif diff == 1:
+            # Note dièse désirée → dièse (b + # = naturel, donc #)
+            alter_str = ':#'
+        else:  # diff == -1
+            # Note bémol désirée → bémol double
+            alter_str = ':bb'
+    else:
+        # L'armure ne met rien sur cette note
+        if diff == 0:
+            # Note naturelle → pas d'altération
+            alter_str = ''
+        elif diff == 1:
+            # Note dièse désirée → dièse simple
+            alter_str = ':#'
+        else:  # diff == -1
+            # Note bémol désirée → bémol simple
+            alter_str = ':b'
+    
+    return f"{base_name}/{vexflow_octave}{alter_str}"
 
 
 def vexflow_key_to_pitch(key: str) -> int:
-    """'c#/4' → MIDI pitch"""
+    """'c#/4' → MIDI pitch (gère aussi les altérations: 'b/4:n', 'f#/4:#', etc.)"""
     NOTE_ST = {'c': 0, 'd': 2, 'e': 4, 'f': 5, 'g': 7, 'a': 9, 'b': 11}
     parts = key.split('/')
     if len(parts) != 2:
         return 60
     note_str = parts[0].lower()
-    octave = int(parts[1])
+    # Extraire uniquement le nombre de l'octave (ignorer les altérations comme :n, :#, :b, :x, :bb)
+    octave_str = parts[1].split(':')[0]  # '4:n' → '4', '4:#' → '4'
+    try:
+        octave = int(octave_str)
+    except ValueError:
+        return 60
     base = NOTE_ST.get(note_str[0], 0)
     mod = note_str[1:].count('#') - note_str[1:].count('b')
     return (octave + 1) * 12 + base + mod

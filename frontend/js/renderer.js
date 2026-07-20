@@ -40,10 +40,11 @@ class ScoreRenderer {
     this.lastHighlightedNoteId = null;
     this.lastHighlightedKeyIdx = null;
 
-    // Cases à cocher UI : afficher/masquer la pédale et les noms d'accords
-    // sans re-transcrire (débrayage instantané, cf. index.html / app.js).
+    // Cases à cocher UI : afficher/masquer la pédale, les noms d'accords
+    // et les noms de notes aigües sans re-transcrire (débrayage instantané, cf. index.html / app.js).
     this.showPedals = true;
     this.showChordSymbols = true;
+    this.showHighestNote = true;  // nom de la note la plus haute en français (désactivé par défaut)
 
     // Debounced resize handler for responsive re-render
     window.addEventListener('resize', () => {
@@ -214,6 +215,10 @@ class ScoreRenderer {
         if (this.showChordSymbols && scoreData.chordSymbols && scoreData.chordSymbols.length > 0) {
           this._renderChordSymbols(ctx, trebleStave, scoreData.chordSymbols, measureIndex, MPR);
         }
+
+        /* ── Notes les plus hautes de la main droite (pour aider les débutants) ── */
+        // NOTE : Le rendu des noms est maintenant délégué à renderHighestNoteLabels()
+        // en post-rendu, pour utiliser getBBox() des noteheads réels.
       }
     }
 
@@ -577,6 +582,23 @@ class ScoreRenderer {
             if (!nd.isRest) {
               const heads = el.querySelectorAll('.vf-notehead');
               info.numHeads = heads.length || (nd.keys ? nd.keys.length : 1);
+              
+              // ── Ajouter data-* attributes pour les notes de la main droite ──
+              if (hand === 'treble' && !nd.isRest) {
+                // Chercher si cette note est dans highestNotes
+                const measureData = this._scoreData?.measures?.[info.measureIndex];
+                // m_start est maintenant envoyé directement par le backend
+                const m_start = measureData?.m_start ?? 0;
+                const beatInMeasure = nd.startBeat - m_start;
+                
+                const highestNote = measureData?.highestNotes?.find(
+                  hn => Math.abs(hn.beatInMeasure - beatInMeasure) < 0.05
+                );
+                if (highestNote) {
+                  el.setAttribute('data-highest-note', highestNote.noteName);
+                  el.setAttribute('data-highest-pitch', highestNote.midiPitch);
+                }
+              }
             }
           }
         } catch (err) {
@@ -1016,6 +1038,103 @@ class ScoreRenderer {
       text.textContent = cs.symbol;
       svg.appendChild(text);
     });
+  }
+
+  /* ── Note la plus haute (pour aider les débutants) ─────────────────── */
+  _renderHighestNote(ctx, trebleStave, highestNote, measureIndex, MPR) {
+    const svg = this.container.querySelector('svg');
+    if (!svg) return;
+
+    const noteStartX = trebleStave.getNoteStartX();
+    const noteEndX   = trebleStave.getNoteEndX ? trebleStave.getNoteEndX() : (trebleStave.getX() + trebleStave.getWidth());
+    const noteWidth  = noteEndX - noteStartX;
+    const staveY     = trebleStave.getY();
+
+    // Position X : au début de la mesure, légèrement décalé pour éviter la clé
+    const x = noteStartX + 5;
+
+    // Position Y : au-dessus de la portée, bien au-dessus des notes
+    // staveY = haut de la portée treble. Les accords sont à ~staveY - 8.
+    // On place la note à staveY - 28 pour éviter tout chevauchement.
+    const y = staveY - 28;
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', x);
+    text.setAttribute('y', y);
+    text.setAttribute('font-family', 'Arial, sans-serif');
+    text.setAttribute('font-size', '12');
+    text.setAttribute('font-weight', 'bold');
+    text.setAttribute('fill', '#7c3aed');  // violet pour distinguer visuellement
+    text.setAttribute('text-anchor', 'start');
+    text.setAttribute('font-style', 'italic');
+    text.textContent = highestNote;
+    svg.appendChild(text);
+  }
+
+  /* ── Post-rendu : noms de notes les plus hautes (basé sur getBBox) ── */
+  /**
+   * Après le rendu VexFlow, parcourt tous les noteheads marqués avec
+   * data-highest-note et dessine le nom AU-DESSUS de chaque note.
+   * Les noms sont groupés dans un groupe SVG identifiable (#highest-note-labels)
+   * pour pouvoir être supprimés/modifiés individuellement.
+   */
+  renderHighestNoteLabels() {
+    const svg = this.container.querySelector('svg');
+    if (!svg) return;
+    console.log('[Renderer] renderHighestNoteLabels() appelé, showHighestNote=', this.showHighestNote);
+
+    // Supprimer les anciens labels s'ils existent
+    const oldGroup = svg.querySelector('#highest-note-labels');
+    if (oldGroup) oldGroup.remove();
+
+    // Créer le groupe SVG pour les labels
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    group.setAttribute('id', 'highest-note-labels');
+    group.setAttribute('pointer-events', 'none');
+    svg.appendChild(group);
+
+    // Trouver tous les noteheads marqués
+    const noteheads = svg.querySelectorAll('[data-highest-note]');
+    console.log('[Renderer] Noteheads trouvés avec data-highest-note:', noteheads.length);
+    if (noteheads.length === 0) return;
+
+    noteheads.forEach(nh => {
+      const noteName = nh.getAttribute('data-highest-note');
+      if (!noteName) return;
+
+      try {
+        const bbox = nh.getBBox();
+        const cx = bbox.x + bbox.width / 2; // centre de la note
+
+        // Position Y : au-dessus de la portée de la ligne de la note
+        // Le notehead est dans la portée treble ou bass selon la ligne
+        const noteTopY = bbox.y;
+        const y = noteTopY - 16; // 16 pixels au-dessus du notehead
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', cx);
+        text.setAttribute('y', y);
+        text.setAttribute('font-family', 'Arial, sans-serif');
+        text.setAttribute('font-size', '11');
+        text.setAttribute('font-weight', 'bold');
+        text.setAttribute('fill', '#7c3aed');  // violet pour distinguer visuellement
+        text.setAttribute('text-anchor', 'middle');  // centré sur la note
+        text.setAttribute('font-style', 'italic');
+        text.setAttribute('pointer-events', 'none');
+        text.textContent = noteName;
+        group.appendChild(text);
+      } catch (e) {
+        console.warn('[Renderer] Erreur rendu label note:', e);
+      }
+    });
+  }
+
+  /* ── Supprimer les labels de notes les plus hautes ─────────────────── */
+  clearHighestNoteLabels() {
+    const svg = this.container.querySelector('svg');
+    if (!svg) return;
+    const group = svg.querySelector('#highest-note-labels');
+    if (group) group.remove();
   }
 
   /* ── Pédales ────────────────────────────────────────────────────────── */

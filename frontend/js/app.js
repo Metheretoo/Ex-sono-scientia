@@ -1,7 +1,4 @@
-/**
- * app.js — Logique principale de l'application AudioScore
- *
- * Responsabilités :
+/* Responsabilités :
  *  - Gestion upload (drag & drop + sélection)
  *  - Appel de l'API (/api/transcribe + SSE /api/transcribe-progress/<job_id>)
  *  - Affichage de la progression TEMPS RÉEL par étapes
@@ -149,7 +146,18 @@ function initUploadZone() {
 
   document.getElementById('btn-new-upload')?.addEventListener('click', () => {
     if (player) player.stop();
-	updateProgress(0);
+    // Remettre à zéro la barre de progression de lecture (visuel uniquement, la lecture démarre bien au début)
+    const playbackProgressBar = document.getElementById('playback-progress-bar');
+    if (playbackProgressBar) playbackProgressBar.style.width = '0%';
+    const playbackTimeDisplay = document.getElementById('playback-time-display');
+    if (playbackTimeDisplay) {
+      try {
+        playbackTimeDisplay.textContent = `0:00 / ${playbackTimeDisplay.textContent.split(' / ').pop() || '0:00'}`;
+      } catch (_) {
+        playbackTimeDisplay.textContent = '0:00 / 0:00';
+      }
+    }
+    updateProgress(0);
     showSection('upload');
     selectedFile = null;
     fileInput.value = '';
@@ -404,8 +412,9 @@ function initTranscriptionOptions() {
     }
   }
 
-  const showPedalCb = document.getElementById('show-pedal');
-  const showChordsCbToggle = document.getElementById('show-chords');
+  const showPedalCb = document.getElementById('show-pedal-toolbar');
+  const showChordsCbToggle = document.getElementById('show-chords-toolbar');
+  const showHighestNoteCb = document.getElementById('show-highest-note-toolbar');
   const qsSlider = document.getElementById('quantization-sensitivity');
   const qsDisplay = document.getElementById('quantization-sensitivity-display');
 
@@ -413,10 +422,20 @@ function initTranscriptionOptions() {
     if (!renderer) return;
     renderer.showPedals = showPedalCb ? showPedalCb.checked : true;
     renderer.showChordSymbols = showChordsCbToggle ? showChordsCbToggle.checked : false;
-    if (window.currentScoreData) renderer.render(window.currentScoreData);
+    renderer.showHighestNote = showHighestNoteCb ? showHighestNoteCb.checked : false;
+    if (window.currentScoreData) {
+      renderer.render(window.currentScoreData);
+      // Post-rendu : dessiner les noms de notes au-dessus des noteheads
+      if (renderer.showHighestNote) {
+        renderer.renderHighestNoteLabels();
+      } else {
+        renderer.clearHighestNoteLabels();
+      }
+    }
   }
   if (showPedalCb) showPedalCb.addEventListener('change', refreshDisplayToggles);
   if (showChordsCbToggle) showChordsCbToggle.addEventListener('change', refreshDisplayToggles);
+  if (showHighestNoteCb) showHighestNoteCb.addEventListener('change', refreshDisplayToggles);
 
   function updateQuantizationSensitivitySlider() {
     if (!qsSlider || !qsDisplay) return;
@@ -762,12 +781,13 @@ async function startTranscription(file) {
   formData.append('detect_tempo', document.getElementById('detect-tempo')?.checked ? 'true' : 'false');
   formData.append('detect_meter', document.getElementById('detect-meter')?.checked ? 'true' : 'false');
   formData.append('detect_key', document.getElementById('detect-key')?.checked ? 'true' : 'false');
-   formData.append('enable_rubato', document.getElementById('enable-rubato')?.checked ? 'true' : 'false');
-   formData.append('enable_triplets', document.getElementById('enable-triplets')?.checked ? 'true' : 'false');
-   formData.append('strict_mode', document.getElementById('strict-mode')?.checked ? 'true' : 'false');
-   const qsSlider = document.getElementById('quantization-sensitivity');
-   if (qsSlider && qsSlider.value !== '') {
-     formData.append('quantization_sensitivity', qsSlider.value);
+    formData.append('enable_rubato', document.getElementById('enable-rubato')?.checked ? 'true' : 'false');
+    formData.append('enable_triplets', document.getElementById('enable-triplets')?.checked ? 'true' : 'false');
+    formData.append('enable_smooth', document.getElementById('enable-smooth')?.checked ? 'true' : 'false');
+    formData.append('strict_mode', document.getElementById('strict-mode')?.checked ? 'true' : 'false');
+    const qsSliderLocal = document.getElementById('quantization-sensitivity');
+    if (qsSliderLocal && qsSliderLocal.value !== '') {
+     formData.append('quantization_sensitivity', qsSliderLocal.value);
    }
    const harmonicFilterEl = document.getElementById('harmonic-filter');
    const harmonicFilterValue = harmonicFilterEl?.value || 'classical';
@@ -947,6 +967,12 @@ function handleTranscriptionResult(result) {
   sleep(400).then(() => {
     showSection('score');
 
+    // Remettre à zéro la barre de progression de lecture pour la nouvelle partition
+    const playbackProgressBar = document.getElementById('playback-progress-bar');
+    if (playbackProgressBar) playbackProgressBar.style.width = '0%';
+    const playbackTimeDisplay = document.getElementById('playback-time-display');
+    if (playbackTimeDisplay) playbackTimeDisplay.textContent = '0:00 / 0:00';
+
   const detectedKey = score_data.keySignature;
     const detectKeyCb = document.getElementById('detect-key');
     const useManualKey = detectKeyCb && !detectKeyCb.checked;
@@ -966,6 +992,12 @@ function handleTranscriptionResult(result) {
     if (editor && typeof editor.setKeySignature === 'function') editor.setKeySignature(detectedKey);
 
     window.currentScoreData = score_data;
+
+    // ✅ Rendre les noms de notes les plus hautes après chargement de la partition
+    if (renderer && renderer.showHighestNote && typeof renderer.renderHighestNoteLabels === 'function') {
+      renderer.renderHighestNoteLabels();
+    }
+
     if (score_data.tempoMapMethod) { updateTempoDisplay(score_data); initTempoSlider(score_data.tempo); }
     if (score_data.detectedMeter) updateDetectedMeter(score_data.detectedMeter);
     displayWarnings(score_data.warnings);
@@ -1168,6 +1200,7 @@ function displayWarnings(warnings) {
 function initToolbar() {
   document.getElementById('btn-up')?.addEventListener('click', () => editor.transposeSelected(1));
   document.getElementById('btn-down')?.addEventListener('click', () => editor.transposeSelected(-1));
+  document.getElementById('btn-enharmonic')?.addEventListener('click', () => editor.toggleEnharmonic());
 
   document.querySelectorAll('.dur-btn').forEach(btn => {
     btn.addEventListener('click', () => {

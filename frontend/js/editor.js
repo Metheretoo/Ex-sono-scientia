@@ -190,6 +190,78 @@ class ScoreEditor {
     this._afterEdit(note);
   }
 
+  /**
+   * Toggle l'enharmonie de la note sélectionnée.
+   * Ex: Sol# ↔ La♭, Fa# ↔ Sol♭, Do# ↔ Ré♭, etc.
+   * Conserve le même MIDI pitch mais change le nom de note.
+   */
+  toggleEnharmonic() {
+    const found = this._findSelected();
+    if (!found || found.note.isRest) return;
+
+    this._pushHistory();
+
+    const note = found.note;
+    const keyIdx = this.selectedKeyIdx ?? 0;
+    const keySig = this.scoreData.keySignature || 'C';
+
+    if (note.keys && note.keys.length > keyIdx) {
+      const targetKey = note.keys[keyIdx];
+      const pitch = vexflowKeyToMidi(targetKey);
+
+      // Mapping enharmonique : pour chaque pitch, donner l'alternative
+      const enharmonicMap = {
+        'c#': 'db', 'db': 'c#',
+        'd#': 'eb', 'eb': 'd#',
+        'f#': 'gb', 'gb': 'f#',
+        'g#': 'ab', 'ab': 'g#',
+        'a#': 'bb', 'bb': 'a#',
+      };
+
+      // Extraire le nom de note (sans l'octave)
+      const match = targetKey.match(/^([a-gA-G][#b]?)/i);
+      if (!match) return;
+
+      const noteName = match[1].toLowerCase();
+      const altName = enharmonicMap[noteName];
+
+      if (!altName) {
+        // Pas d'enharmonie disponible (notes sans altération)
+        return;
+      }
+
+      // Extraire l'octave depuis le format VexFlow: "nom/octave" ou "nom/octave:alt"
+      const parts = targetKey.split('/');
+      const octavePart = parts.length >= 2 ? parts[1].split(':')[0] : '4';
+
+      // Déterminer si la note originale avait une altération explicite
+      const hadAccidental = noteName.includes('#') || noteName.includes('b');
+
+      if (hadAccidental) {
+        // La note avait une altération → on reconstruit avec l'altération correcte
+        // Le nom enharmonique (ex: 'ab') porte déjà son bémol natif, donc pas besoin de ':b'
+        // Mais si le nom n'a pas d'altération native (ex: 'c#'), on ajoute ':#'
+        const hasNativeAccidental = altName.includes('#') || altName.includes('b');
+        if (hasNativeAccidental) {
+          note.keys[keyIdx] = `${altName}/${octavePart}`;
+        } else {
+          note.keys[keyIdx] = `${altName}/${octavePart}:#`;
+        }
+      } else {
+        // La note n'avait PAS d'altération (bécarre) → on ajoute ':n' (bécarre explicite)
+        note.keys[keyIdx] = `${altName}/${octavePart}:n`;
+      }
+
+      // Synchroniser le midiPitch principal si c'est la première note
+      if (keyIdx === 0) {
+        note.midiPitch = pitch; // Le pitch MIDI ne change pas !
+      }
+    }
+
+    this._render();
+    this._afterEdit(note);
+  }
+
   /** Change la durée de la note, en ajustant les silences adjacents pour maintenir la cohérence. */
   setDurationSelected(durStr) {
     const found = this._findSelected();
@@ -571,6 +643,10 @@ class ScoreEditor {
       this.renderer.highlightNote(this.selectedNoteIds, this.selectedKeyIdx);
     } else if (this.selectedNoteId) {
       this.renderer.highlightNote(this.selectedNoteId, this.selectedKeyIdx);
+    }
+    // ✅ Rendre les noms de notes les plus hautes après chaque édition
+    if (this.renderer.showHighestNote && typeof this.renderer.renderHighestNoteLabels === 'function') {
+      this.renderer.renderHighestNoteLabels();
     }
   }
 
