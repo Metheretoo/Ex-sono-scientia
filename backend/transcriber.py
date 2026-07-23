@@ -708,17 +708,15 @@ def run_piano_transcription(audio_path, options):
     print(f"[Piano] Inference sur: {actual_device}")
     
     # Préparer les options de transcription
-    # piano_transcription_inference supporte onset_threshold/frame_threshold/offset_threshold
-    # comme arguments NOMMÉS de .transcribe(). C'est PLUS fiable que les attributs.
-    print(f"[Piano] Seuils passés à transcribe() : onset={onset_threshold:.2f}, frame={frame_threshold:.2f}, offset={offset_threshold:.2f}")
+    # piano_transcription_inference NE supporte PAS les arguments nommés dans .transcribe().
+    # Les seuils DOIVENT être appliqués via les attributs du transcriber AVANT l'appel.
+    # .transcribe(audio, midi_path) nécessite un chemin MIDI en 2ème argument.
+    # On passe None pour éviter d'écrire un MIDI temporaire ici (le MIDI est généré
+    # ensuite par write_events_to_midi() dans le code suivant).
+    print(f"[Piano] Seuils appliqués via attributs : onset={onset_threshold:.2f}, frame={frame_threshold:.2f}, offset={offset_threshold:.2f}")
     
     with torch.no_grad():
-        transcribed_dict = transcriber.transcribe(
-            audio,
-            onset_threshold=onset_threshold,
-            frame_threshold=frame_threshold,
-            offset_threshold=offset_threshold,
-        )
+        transcribed_dict = transcriber.transcribe(audio, None)  # None = pas d'écriture MIDI ici
     
     prof.stop()
 
